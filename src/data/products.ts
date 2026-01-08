@@ -3,6 +3,18 @@ const BROWSE_API = import.meta.env.VITE_BROWSE_API_URL || ''
 const INVENTORY_API = import.meta.env.VITE_INVENTORY_API_URL || ''
 const S3_BUCKET = import.meta.env.VITE_S3_BUCKET_URL || ''
 
+// Flash sale interface
+export interface FlashSale {
+  id: string
+  startTime: string // ISO timestamp
+  endTime: string   // ISO timestamp
+  originalPrice: number
+  salePrice: number
+  maxQuantity: number
+  soldQuantity: number
+  isActive: boolean
+}
+
 // Product interface
 export interface Product {
   id: string
@@ -13,6 +25,7 @@ export interface Product {
   sizes: string[]
   isFlashSale: boolean
   inventory: number
+  flashSale?: FlashSale // Optional flash sale details
 }
 
 // Cart item interface
@@ -35,7 +48,17 @@ const mockProducts: Product[] = [
     description: 'The Air Jordan 1 Retro High remakes the classic sneaker, giving you a fresh take on what you know: crisp leather, bold color-blocking and the iconic Wings logo.',
     sizes: ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11'],
     isFlashSale: true,
-    inventory: 25
+    inventory: 25,
+    flashSale: {
+      id: 'flash-1',
+      startTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // Starts in 5 minutes
+      endTime: new Date(Date.now() + 65 * 60 * 1000).toISOString(),   // Ends in 65 minutes
+      originalPrice: 170,
+      salePrice: 129, // 24% off - realistic sneaker sale
+      maxQuantity: 100,
+      soldQuantity: 75,
+      isActive: false
+    }
   },
   {
     id: '2',
@@ -55,7 +78,17 @@ const mockProducts: Product[] = [
     description: 'The Yeezy Boost 350 features a Primeknit upper and Boost midsole for ultimate comfort and style. A must-have for any sneaker collection.',
     sizes: ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11'],
     isFlashSale: true,
-    inventory: 10
+    inventory: 10,
+    flashSale: {
+      id: 'flash-3',
+      startTime: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // Started 10 minutes ago
+      endTime: new Date(Date.now() + 50 * 60 * 1000).toISOString(),   // Ends in 50 minutes
+      originalPrice: 220,
+      salePrice: 179, // 19% off - premium sneaker sale
+      maxQuantity: 50,
+      soldQuantity: 40,
+      isActive: true
+    }
   },
   {
     id: '4',
@@ -187,3 +220,73 @@ export const getProductById = (id: string) => {
 
 // Export mock data for local development
 export { mockProducts }
+
+// Flash sale utility functions
+export const isFlashSaleActive = (flashSale?: FlashSale): boolean => {
+  if (!flashSale) return false
+  
+  const now = new Date()
+  const startTime = new Date(flashSale.startTime)
+  const endTime = new Date(flashSale.endTime)
+  
+  return now >= startTime && now <= endTime && flashSale.soldQuantity < flashSale.maxQuantity
+}
+
+export const getFlashSaleStatus = (flashSale?: FlashSale) => {
+  if (!flashSale) return { status: 'none' }
+  
+  const now = new Date()
+  const startTime = new Date(flashSale.startTime)
+  const endTime = new Date(flashSale.endTime)
+  
+  if (now < startTime) {
+    return {
+      status: 'upcoming',
+      timeUntilStart: startTime.getTime() - now.getTime(),
+      message: 'Flash sale starts soon!'
+    }
+  }
+  
+  if (now > endTime) {
+    return {
+      status: 'ended',
+      message: 'Flash sale has ended'
+    }
+  }
+  
+  if (flashSale.soldQuantity >= flashSale.maxQuantity) {
+    return {
+      status: 'sold_out',
+      message: 'Flash sale sold out!'
+    }
+  }
+  
+  return {
+    status: 'active',
+    timeUntilEnd: endTime.getTime() - now.getTime(),
+    remaining: flashSale.maxQuantity - flashSale.soldQuantity,
+    message: 'Flash sale active!'
+  }
+}
+
+export const formatTimeRemaining = (milliseconds: number): string => {
+  const totalSeconds = Math.floor(milliseconds / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  } else {
+    return `${seconds}s`
+  }
+}
+
+export const getCurrentPrice = (product: Product): number => {
+  if (product.flashSale && isFlashSaleActive(product.flashSale)) {
+    return product.flashSale.salePrice
+  }
+  return product.price
+}
