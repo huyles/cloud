@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchProductById, getLiveInventory, reserveItem, Product } from '../data/products'
+import { fetchProductById, getLiveInventory, reserveItem, Product, getCurrentPrice, isFlashSaleActive } from '../data/products'
+import FlashSaleTimer from '../components/FlashSaleTimer'
 
 const ProductPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -122,6 +123,22 @@ const ProductPage: React.FC = () => {
               🔥 FLASH SALE - LIMITED TIME
             </div>
           )}
+          
+          {/* Flash Sale Timer */}
+          {product.flashSale && (
+            <div style={{ marginBottom: '1rem' }}>
+              <FlashSaleTimer 
+                flashSale={product.flashSale}
+                onStatusChange={(status) => {
+                  // Refresh inventory when flash sale status changes
+                  if (status === 'active' || status === 'ended') {
+                    getLiveInventory(product.id).then(setLiveInventory)
+                  }
+                }}
+              />
+            </div>
+          )}
+          
           <img 
             src={product.image} 
             alt={product.name}
@@ -134,9 +151,81 @@ const ProductPage: React.FC = () => {
             {product.name}
           </h1>
           
-          <p style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-            ${product.price}
-          </p>
+          {/* Dynamic pricing based on flash sale */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            {product.flashSale && isFlashSaleActive(product.flashSale) ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '0.75rem' }}>
+                  <span style={{ 
+                    fontSize: '2.5rem', 
+                    fontWeight: 'bold', 
+                    color: '#ff6b6b'
+                  }}>
+                    ${getCurrentPrice(product)}
+                  </span>
+                  <span style={{ 
+                    fontSize: '1.5rem', 
+                    textDecoration: 'line-through', 
+                    color: '#999'
+                  }}>
+                    ${product.price}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <div style={{ 
+                    background: '#ff6b6b',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}>
+                    {Math.round(((product.price - getCurrentPrice(product)) / product.price) * 100)}% OFF
+                  </div>
+                  <span style={{ 
+                    color: '#28a745', 
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem'
+                  }}>
+                    You save ${product.price - getCurrentPrice(product)}!
+                  </span>
+                </div>
+                
+                <div style={{ 
+                  background: '#fff3cd',
+                  border: '1px solid #ffeaa7',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  color: '#856404',
+                  fontSize: '0.9rem',
+                  fontWeight: '500'
+                }}>
+                  🔥 <strong>Flash Sale Price!</strong> Limited time offer - regular price ${product.price}
+                </div>
+              </div>
+            ) : product.flashSale ? (
+              <div>
+                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#666' }}>
+                  ${product.price}
+                </p>
+                <div style={{ 
+                  background: '#f8f9fa',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  color: '#6c757d',
+                  fontSize: '0.9rem'
+                }}>
+                  ⏰ Flash sale not currently active. Check back later for special pricing!
+                </div>
+              </div>
+            ) : (
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+                ${getCurrentPrice(product)}
+              </p>
+            )}
+          </div>
           
           <p style={{ color: '#666', marginBottom: '2rem', lineHeight: '1.6' }}>
             {product.description}
