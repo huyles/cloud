@@ -134,6 +134,84 @@ body {
   display: inline-block;
 }
 
+/* Flash sale pricing styles */
+.sale-price {
+  color: #ff6b6b !important;
+  font-weight: bold;
+}
+
+.original-price {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.savings-badge {
+  background: #ff6b6b;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.discount-percentage {
+  background: #28a745;
+  color: white;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.price-comparison {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.flash-sale-alert {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: #856404;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.savings-highlight {
+  color: #28a745;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* Timer styles */
+.timer-container {
+  background: #f8f9fa;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.timer-active {
+  background: #fff5f5;
+  border-color: #feb2b2;
+}
+
+.timer-upcoming {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.timer-ended {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .nav {
