@@ -3,6 +3,103 @@ import { Link } from 'react-router-dom'
 import { fetchProducts, Product, getCurrentPrice, isFlashSaleActive } from '../data/products'
 import FlashSaleTimer from '../components/FlashSaleTimer'
 
+// Product Card Component that updates pricing when timer changes
+const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
+  const [saleStatus, setSaleStatus] = useState<string>('none')
+  
+  // Recalculate pricing whenever sale status changes
+  const currentPrice = getCurrentPrice(product)
+  const isOnSale = product.flashSale && isFlashSaleActive(product.flashSale)
+  
+  return (
+    <div className="product-card">
+      {product.isFlashSale && (
+        <div className="flash-sale-badge">
+          FLASH SALE
+        </div>
+      )}
+      
+      {/* Flash Sale Timer */}
+      {product.flashSale && (
+        <FlashSaleTimer 
+          flashSale={product.flashSale}
+          onStatusChange={(status) => {
+            setSaleStatus(status)
+            // This will trigger a re-render and recalculate pricing
+          }}
+        />
+      )}
+      
+      <img 
+        src={product.image} 
+        alt={product.name}
+        className="product-image"
+        onError={() => {
+          console.log('🖼️ Image failed to load:', product.image)
+        }}
+      />
+      <div className="product-info">
+        <h3 className="product-name">{product.name}</h3>
+        
+        {/* Price with sale indication - updates when saleStatus changes */}
+        <div className="product-price" style={{ marginBottom: '0.5rem' }}>
+          {isOnSale ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <span style={{ 
+                  color: '#ff6b6b', 
+                  fontWeight: 'bold', 
+                  fontSize: '1.4rem' 
+                }}>
+                  ${currentPrice}
+                </span>
+                <span style={{ 
+                  textDecoration: 'line-through', 
+                  color: '#999', 
+                  fontSize: '1.1rem'
+                }}>
+                  ${product.price}
+                </span>
+              </div>
+              <div style={{ 
+                color: '#fff', 
+                background: '#ff6b6b',
+                fontSize: '0.75rem', 
+                fontWeight: 'bold',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '4px',
+                display: 'inline-block'
+              }}>
+                SAVE ${product.price - currentPrice} ({Math.round(((product.price - currentPrice) / product.price) * 100)}% OFF)
+              </div>
+            </div>
+          ) : (
+            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>${currentPrice}</span>
+          )}
+        </div>
+        
+        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+          {product.inventory} left in stock
+        </p>
+        {product.inventory < 20 && (
+          <p style={{ color: '#ff6b6b', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+            ⚡ Low Stock - Act Fast!
+          </p>
+        )}
+        <Link to={`/product/${product.id}`}>
+          <button 
+            className="btn btn-primary" 
+            style={{ width: '100%' }}
+            disabled={product.inventory === 0}
+          >
+            {product.inventory === 0 ? 'SOLD OUT' : 'View Details'}
+          </button>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 const HomePage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,98 +186,8 @@ const HomePage: React.FC = () => {
 
       <div className="product-grid">
         {products.map(product => {
-          const currentPrice = getCurrentPrice(product)
-          const isOnSale = product.flashSale && isFlashSaleActive(product.flashSale)
-          
           return (
-            <div key={product.id} className="product-card">
-              {product.isFlashSale && (
-                <div className="flash-sale-badge">
-                  FLASH SALE
-                </div>
-              )}
-              
-              {/* Flash Sale Timer */}
-              {product.flashSale && (
-                <FlashSaleTimer 
-                  flashSale={product.flashSale}
-                  onStatusChange={(status) => {
-                    // Optionally refresh product data when status changes
-                    if (status === 'active' || status === 'ended') {
-                      // Could trigger a product refresh here
-                    }
-                  }}
-                />
-              )}
-              
-              <img 
-                src={product.image} 
-                alt={product.name}
-                className="product-image"
-                onError={() => {
-                  console.log('🖼️ Image failed to load:', product.image)
-                  // You could set a fallback image here
-                }}
-              />
-              <div className="product-info">
-                <h3 className="product-name">{product.name}</h3>
-                
-                {/* Price with sale indication */}
-                <div className="product-price" style={{ marginBottom: '0.5rem' }}>
-                  {isOnSale ? (
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                        <span style={{ 
-                          color: '#ff6b6b', 
-                          fontWeight: 'bold', 
-                          fontSize: '1.4rem' 
-                        }}>
-                          ${currentPrice}
-                        </span>
-                        <span style={{ 
-                          textDecoration: 'line-through', 
-                          color: '#999', 
-                          fontSize: '1.1rem'
-                        }}>
-                          ${product.price}
-                        </span>
-                      </div>
-                      <div style={{ 
-                        color: '#fff', 
-                        background: '#ff6b6b',
-                        fontSize: '0.75rem', 
-                        fontWeight: 'bold',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '4px',
-                        display: 'inline-block'
-                      }}>
-                        SAVE ${product.price - currentPrice} ({Math.round(((product.price - currentPrice) / product.price) * 100)}% OFF)
-                      </div>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>${currentPrice}</span>
-                  )}
-                </div>
-                
-                <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  {product.inventory} left in stock
-                </p>
-                {product.inventory < 20 && (
-                  <p style={{ color: '#ff6b6b', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-                    ⚡ Low Stock - Act Fast!
-                  </p>
-                )}
-                <Link to={`/product/${product.id}`}>
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ width: '100%' }}
-                    disabled={product.inventory === 0}
-                  >
-                    {product.inventory === 0 ? 'SOLD OUT' : 'View Details'}
-                  </button>
-                </Link>
-              </div>
-            </div>
+            <ProductCard key={product.id} product={product} />
           )
         })}
       </div>
@@ -195,11 +202,4 @@ const HomePage: React.FC = () => {
           fontSize: '0.9rem',
           color: '#666'
         }}>
-          🔧 Debug: Loaded {products.length} products in development mode
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default HomePage
+          🔧 Debug: Loa
