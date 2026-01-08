@@ -76,7 +76,41 @@ const ProductPage: React.FC = () => {
       if (result.success) {
         setReservationStatus('success')
         setLiveInventory(prev => Math.max(0, prev - 1))
-        alert(`🎉 Item reserved! You have 10 minutes to complete checkout.\nReservation ID: ${result.reservationId}`)
+        
+        // Add item to cart
+        const cartItem = {
+          id: product.id,
+          name: product.name,
+          price: getCurrentPrice(product),
+          size: selectedSize,
+          quantity: 1,
+          image: product.image
+        }
+        
+        // Get existing cart from localStorage
+        const existingCart = localStorage.getItem('flashdrop-cart')
+        let cartItems = existingCart ? JSON.parse(existingCart) : []
+        
+        // Check if item with same id and size already exists
+        const existingItemIndex = cartItems.findIndex(
+          (item: any) => item.id === cartItem.id && item.size === cartItem.size
+        )
+        
+        if (existingItemIndex >= 0) {
+          // Update quantity if item exists
+          cartItems[existingItemIndex].quantity += 1
+        } else {
+          // Add new item if it doesn't exist
+          cartItems.push(cartItem)
+        }
+        
+        // Save updated cart to localStorage
+        localStorage.setItem('flashdrop-cart', JSON.stringify(cartItems))
+        
+        // Trigger cart count update in header
+        window.dispatchEvent(new Event('cartUpdated'))
+        
+        alert(`🎉 Item added to cart! You have 10 minutes to complete checkout.\nReservation ID: ${result.reservationId}`)
       } else {
         setReservationStatus('failed')
         alert('Sorry, item sold out during reservation. Please try another size.')
