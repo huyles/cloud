@@ -5,15 +5,18 @@ A React-based e-commerce frontend designed for flash sales and high-traffic scen
 ## 🚀 Frontend Setup
 
 ### Prerequisites
+
 - Node.js (v18+)
 - npm or yarn
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Start Development Server
+
 ```bash
 npm run dev
 ```
@@ -28,19 +31,27 @@ Visit: http://localhost:5173
 flashdrop-frontend/
 ├── src/
 │   ├── components/          # React components
-│   │   └── Header.tsx       # Navigation header
+│   │   ├── Header.tsx       # Navigation header
+│   │   └── FlashSaleTimer.tsx # Flash sale countdown
 │   ├── data/
 │   │   └── products.ts      # Product data & API calls
 │   ├── pages/               # Page components
 │   │   ├── HomePage.tsx     # Product listing
 │   │   ├── ProductPage.tsx  # Product details
-│   │   └── CartPage.tsx     # Shopping cart
+│   │   ├── CartPage.tsx     # Shopping cart
+│   │   ├── CheckoutPage.tsx # Payment & checkout
+│   │   └── CheckoutSuccessPage.tsx # Order confirmation
 │   ├── App.tsx              # Main app component
 │   ├── main.tsx             # Entry point
 │   └── index.css            # Global styles
+├── cart-service/            # Go-based cart & checkout microservice
+│   ├── main.go              # Cart service implementation
+│   ├── Dockerfile           # Container configuration
+│   ├── docker-compose.yml   # Docker orchestration
+│   └── README.md            # Service documentation
 ├── public/                  # Static assets & product images
 ├── .env.example             # Environment variables template
-├── .env.local               # Local development config
+├── .env                     # Local development config
 └── package.json             # Dependencies
 ```
 
@@ -51,9 +62,48 @@ flashdrop-frontend/
 - ✅ **Product Details** - Individual product pages with size selection
 - ✅ **Real-time Inventory** - Live stock counters
 - ✅ **Reservation System** - Reserve items before checkout
+- ✅ **Shopping Cart** - Full cart management with service sync
+- ✅ **Checkout Flow** - Payment processing with mock gateway
+- ✅ **Order Confirmation** - Success page with order details
 - ✅ **Responsive Design** - Works on desktop and mobile
 - ✅ **Loading States** - Smooth user experience
 - ✅ **Error Handling** - Graceful fallbacks to mock data
+
+## 🛒 Cart Service (Go Microservice)
+
+The cart and checkout functionality runs as a separate containerized Go service with:
+
+- **Concurrency Control**: Read-write locks for thread-safe cart operations
+- **Session Management**: Cart persistence with 30-minute expiration
+- **Mock Payment Processing**: Simulated payment gateway with validation
+- **Order Management**: Complete order lifecycle handling
+
+### Running the Cart Service
+
+```bash
+# Using Docker (recommended)
+cd cart-service
+docker-compose up --build
+
+# Or run directly with Go
+cd cart-service
+go run main.go
+```
+
+The service runs on `http://localhost:8080` by default.
+
+### Cart Service Endpoints
+
+| Method | Endpoint                                 | Description      |
+| ------ | ---------------------------------------- | ---------------- |
+| GET    | `/health`                                | Health check     |
+| GET    | `/api/cart/{sessionId}`                  | Get cart         |
+| PUT    | `/api/cart/{sessionId}`                  | Save cart        |
+| POST   | `/api/cart/{sessionId}/item`             | Add item         |
+| PATCH  | `/api/cart/{sessionId}/item/{id}/{size}` | Update quantity  |
+| DELETE | `/api/cart/{sessionId}/item/{id}/{size}` | Remove item      |
+| POST   | `/api/checkout`                          | Process checkout |
+| GET    | `/api/order/{orderId}`                   | Get order        |
 
 ## 🔗 AWS Integration
 
@@ -69,20 +119,26 @@ React Frontend → API Gateway → Lambda (Products) + ECS (Inventory) → Dynam
 
 The frontend uses environment variables to connect to AWS services:
 
-**Local Development (.env.local)**
+**Local Development (.env)**
+
 ```env
 # Uses mock data - no AWS needed
 VITE_BROWSE_API_URL=
 VITE_INVENTORY_API_URL=
 VITE_S3_BUCKET_URL=
+# Cart service (runs locally via Docker)
+VITE_CART_SERVICE_URL=http://localhost:8080
 ```
 
 **AWS Production (.env)**
+
 ```env
 # Connect to your AWS services
 VITE_BROWSE_API_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com/prod
 VITE_INVENTORY_API_URL=https://your-inventory-api.execute-api.us-east-1.amazonaws.com/prod
 VITE_S3_BUCKET_URL=https://your-bucket.s3.amazonaws.com
+# Cart service (deployed to ECS or any container service)
+VITE_CART_SERVICE_URL=https://your-cart-service.amazonaws.com
 ```
 
 ## ☁️ AWS Backend Requirements
@@ -90,6 +146,7 @@ VITE_S3_BUCKET_URL=https://your-bucket.s3.amazonaws.com
 To connect this frontend to AWS, you need to create these backend services:
 
 ### 1. DynamoDB Table (Product Catalog)
+
 ```bash
 aws dynamodb create-table \
   --table-name FlashDrop-Products \
@@ -99,26 +156,34 @@ aws dynamodb create-table \
 ```
 
 ### 2. Lambda Function (Product Browsing)
+
 Create a Lambda function that:
+
 - Scans DynamoDB for all products (`GET /products`)
 - Gets single product by ID (`GET /products/{id}`)
 - Returns JSON with CORS headers
 
 ### 3. API Gateway (HTTP Endpoints)
+
 Set up REST API with:
+
 - `/products` - GET all products
 - `/products/{id}` - GET single product
 - CORS enabled for your domain
 - Connected to Lambda function
 
 ### 4. ECS Service (Inventory Management)
+
 Create containerized service for:
+
 - Real-time inventory tracking
 - Item reservation with locking
 - Integration with ElastiCache
 
 ### 5. S3 Bucket (Product Images)
+
 Upload product images and configure:
+
 - Public read access
 - CORS for your domain
 - Optional: CloudFront CDN
@@ -129,9 +194,9 @@ Upload product images and configure:
 
 ```javascript
 // Frontend calls AWS APIs
-const products = await fetch(`${BROWSE_API}/products`)
-const inventory = await fetch(`${INVENTORY_API}/inventory/${productId}`)
-const reservation = await fetch(`${INVENTORY_API}/reserve`, { method: 'POST' })
+const products = await fetch(`${BROWSE_API}/products`);
+const inventory = await fetch(`${INVENTORY_API}/inventory/${productId}`);
+const reservation = await fetch(`${INVENTORY_API}/reserve`, { method: "POST" });
 ```
 
 ### Automatic Fallback
@@ -142,26 +207,28 @@ The frontend automatically falls back to mock data when AWS APIs are unavailable
 // In src/data/products.ts
 export const fetchProducts = async () => {
   if (!BROWSE_API) {
-    return mockProducts  // Uses local mock data
+    return mockProducts; // Uses local mock data
   }
-  
+
   try {
-    const response = await fetch(`${BROWSE_API}/products`)
-    return await response.json()
+    const response = await fetch(`${BROWSE_API}/products`);
+    return await response.json();
   } catch (error) {
-    return mockProducts  // Fallback on error
+    return mockProducts; // Fallback on error
   }
-}
+};
 ```
 
 ## 🚀 Deployment Options
 
 ### Option 1: Local Development
+
 ```bash
 npm run dev  # Uses mock data
 ```
 
 ### Option 2: AWS Development
+
 ```bash
 # Set your AWS API URLs
 echo VITE_BROWSE_API_URL=https://your-api.amazonaws.com/prod > .env
@@ -169,12 +236,14 @@ npm run dev  # Now uses real AWS APIs
 ```
 
 ### Option 3: Docker Deployment
+
 ```bash
 docker build -t flashdrop-frontend .
 docker run -p 3000:80 flashdrop-frontend
 ```
 
 ### Option 4: AWS ECS Deployment
+
 ```bash
 # Build with AWS environment variables
 docker build \
@@ -189,26 +258,32 @@ docker build \
 ## 🧪 Testing Frontend
 
 ### 1. Local Testing (Mock Data)
+
 ```bash
 npm run dev
 ```
+
 - Should show 4 products
 - Flash sale badges visible
 - Product pages work
 - Reservation system simulated
 
 ### 2. AWS Integration Testing
+
 ```bash
 # Set AWS environment variables
 echo VITE_BROWSE_API_URL=https://your-api.amazonaws.com/prod > .env
 npm run dev
 ```
+
 - Products load from DynamoDB
 - Real-time inventory updates
 - Actual reservations processed
 
 ### 3. Console Debugging
+
 Open browser DevTools (F12) and check:
+
 - `🔧 Using mock data - no API configured` (local mode)
 - `✅ Products loaded from AWS` (AWS mode)
 - No JavaScript errors
@@ -216,11 +291,13 @@ Open browser DevTools (F12) and check:
 ## 🚨 Troubleshooting
 
 ### Frontend Issues
+
 - **Blank page**: Check browser console for errors
 - **Products not loading**: Verify API URLs in .env file
 - **CORS errors**: Ensure API Gateway has CORS enabled
 
 ### AWS Connection Issues
+
 - **API not found**: Verify API Gateway URL is correct
 - **403 Forbidden**: Check API Gateway permissions and CORS
 - **500 Errors**: Check Lambda function logs in CloudWatch
@@ -228,6 +305,7 @@ Open browser DevTools (F12) and check:
 ## 📊 Frontend Performance
 
 ### Optimizations Included
+
 - **Code splitting** - Lazy loading of routes
 - **Image optimization** - Proper sizing and formats
 - **Caching** - API responses cached locally
@@ -235,6 +313,7 @@ Open browser DevTools (F12) and check:
 - **Loading states** - Smooth user experience
 
 ### AWS Performance Benefits
+
 - **Lambda auto-scaling** - Handles traffic spikes
 - **ElastiCache** - Sub-millisecond inventory updates
 - **CloudFront CDN** - Fast global image delivery
@@ -243,6 +322,7 @@ Open browser DevTools (F12) and check:
 ## 🎯 Frontend-AWS Integration Checklist
 
 ### ✅ Frontend Ready
+
 - [x] React components built
 - [x] API integration layer ready
 - [x] Environment variable configuration
@@ -251,6 +331,7 @@ Open browser DevTools (F12) and check:
 - [x] Production build process
 
 ### ⏳ AWS Backend Needed
+
 - [ ] DynamoDB table with product data
 - [ ] Lambda function for product browsing
 - [ ] API Gateway with CORS enabled
@@ -259,6 +340,7 @@ Open browser DevTools (F12) and check:
 - [ ] ElastiCache for real-time updates
 
 ### 🔗 Connection Steps
+
 1. Create AWS backend services
 2. Get API Gateway URLs
 3. Update `.env` file with real URLs

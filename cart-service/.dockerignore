@@ -1,0 +1,39 @@
+# Dependencies
+vendor/
+
+# Build artifacts
+cart-service
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+*.test
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Documentation
+README.md
+docs/
+
+# Misc
+.env
+.env.*
+*.log

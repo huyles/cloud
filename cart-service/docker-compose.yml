@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  cart-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flashdrop-cart-service
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - flashdrop-network
+
+networks:
+  flashdrop-network:
+    driver: bridge

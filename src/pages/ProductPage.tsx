@@ -87,8 +87,12 @@ const ProductPage: React.FC = () => {
           image: product.image
         }
         
+        console.log('🛒 Adding item to cart:', cartItem)
+        
         // Get existing cart from localStorage
         const existingCart = localStorage.getItem('flashdrop-cart')
+        console.log('📦 Existing cart from localStorage:', existingCart)
+        
         let cartItems = existingCart ? JSON.parse(existingCart) : []
         
         // Check if item with same id and size already exists
@@ -99,16 +103,24 @@ const ProductPage: React.FC = () => {
         if (existingItemIndex >= 0) {
           // Update quantity if item exists
           cartItems[existingItemIndex].quantity += 1
+          console.log('➕ Updated existing item quantity')
         } else {
           // Add new item if it doesn't exist
           cartItems.push(cartItem)
+          console.log('🆕 Added new item to cart')
         }
         
         // Save updated cart to localStorage
         localStorage.setItem('flashdrop-cart', JSON.stringify(cartItems))
+        console.log('💾 Saved cart to localStorage:', cartItems)
+        
+        // Verify it was saved
+        const verifyCart = localStorage.getItem('flashdrop-cart')
+        console.log('✅ Verified localStorage:', verifyCart)
         
         // Trigger cart count update in header
         window.dispatchEvent(new Event('cartUpdated'))
+        console.log('📢 Dispatched cartUpdated event')
         
         alert(`🎉 Item added to cart! You have 10 minutes to complete checkout.\nReservation ID: ${result.reservationId}`)
       } else {

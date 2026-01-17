@@ -1,23 +1,105 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { CartItem, fetchProductById, getCurrentPrice } from '../data/products'
 
-const CartPage: React.FC = () => {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+// Cart Service API URL - Using Vite environment variables
+const CART_SERVICE_URL = import.meta.env.VITE_CART_SERVICE_URL || 'http://localhost:8080'
 
-  // Load cart from localStorage
-  useEffect(() => {
+// Get or create session ID
+const getSessionId = (): string => {
+  let sessionId = localStorage.getItem('flashdrop-session-id')
+  if (!sessionId) {
+    sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    localStorage.setItem('flashdrop-session-id', sessionId)
+  }
+  return sessionId
+}
+
+// Sync cart to service
+const syncCartToService = async (items: CartItem[]): Promise<void> => {
+  try {
+    const sessionId = getSessionId()
+    await fetch(`${CART_SERVICE_URL}/api/cart/${sessionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items)
+    })
+    console.log('✅ Cart synced to cart-service')
+  } catch (error) {
+    console.log('Cart service not available:', error)
+  }
+}
+
+// Check if cart service is available
+const checkServiceHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${CART_SERVICE_URL}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000)
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+// Load cart from localStorage
+const loadCartFromStorage = (): CartItem[] => {
+  try {
     const savedCart = localStorage.getItem('flashdrop-cart')
     if (savedCart) {
-      try {
-        const items = JSON.parse(savedCart)
-        setCartItems(items)
-      } catch (error) {
-        console.error('Error loading cart:', error)
-        setCartItems([])
-      }
+      const parsed = JSON.parse(savedCart)
+      console.log('📦 Loaded cart from localStorage:', parsed)
+      return Array.isArray(parsed) ? parsed : []
     }
+  } catch (error) {
+    console.error('Error loading cart from localStorage:', error)
+  }
+  return []
+}
+
+const CartPage: React.FC = () => {
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [serviceAvailable, setServiceAvailable] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Load cart function - can be called to refresh
+  const loadCart = useCallback(() => {
+    console.log('🔄 Loading cart...')
+    const items = loadCartFromStorage()
+    setCartItems(items)
+    setIsLoading(false)
+    return items
   }, [])
+
+  // Initial load and event listeners
+  useEffect(() => {
+    // Load cart immediately
+    const items = loadCart()
+
+    // Check service availability
+    checkServiceHealth().then(available => {
+      setServiceAvailable(available)
+      if (available && items.length > 0) {
+        syncCartToService(items)
+      }
+    })
+
+    // Listen for cart updates (when items are added from ProductPage)
+    const handleCartUpdate = () => {
+      console.log('🔔 Cart update event received')
+      loadCart()
+    }
+
+    // Listen for both custom event and storage event
+    window.addEventListener('cartUpdated', handleCartUpdate)
+    window.addEventListener('storage', handleCartUpdate)
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate)
+      window.removeEventListener('storage', handleCartUpdate)
+    }
+  }, [loadCart])
 
   // Update prices based on current flash sale status
   useEffect(() => {
@@ -27,12 +109,9 @@ const CartPage: React.FC = () => {
       const updatedItems = await Promise.all(
         cartItems.map(async (cartItem) => {
           try {
-            // Fetch current product data to get latest flash sale info
             const currentProduct = await fetchProductById(cartItem.id)
             if (currentProduct) {
               const currentPrice = getCurrentPrice(currentProduct)
-              
-              // Update cart item price if it has changed
               if (currentPrice !== cartItem.price) {
                 console.log(`💰 Price updated for ${cartItem.name}: $${cartItem.price} → $${currentPrice}`)
                 return { ...cartItem, price: currentPrice }
@@ -46,9 +125,8 @@ const CartPage: React.FC = () => {
         })
       )
 
-      // Update cart if any prices changed
       const pricesChanged = updatedItems.some((item, index) => 
-        item.price !== cartItems[index].price
+        item.price !== cartItems[index]?.price
       )
 
       if (pricesChanged) {
@@ -56,52 +134,117 @@ const CartPage: React.FC = () => {
       }
     }
 
-    // Update prices immediately
-    updatePrices()
+    if (cartItems.length > 0) {
+      updatePrices()
+      const interval = setInterval(updatePrices, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [cartItems.length])
 
-    // Update prices every 30 seconds to catch flash sale changes
-    const interval = setInterval(updatePrices, 30000)
-    
-    return () => clearInterval(interval)
-  }, [cartItems.length]) // Only depend on cart length to avoid infinite loops
-
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage whenever cartItems changes (but not on initial load)
   useEffect(() => {
-    localStorage.setItem('flashdrop-cart', JSON.stringify(cartItems))
-    // Trigger cart count update in header
-    window.dispatchEvent(new Event('cartUpdated'))
-  }, [cartItems])
+    if (!isLoading && cartItems.length >= 0) {
+      localStorage.setItem('flashdrop-cart', JSON.stringify(cartItems))
+      console.log('💾 Saved cart to localStorage:', cartItems.length, 'items')
+      
+      // Sync with cart service
+      if (serviceAvailable && cartItems.length > 0) {
+        syncCartToService(cartItems)
+      }
+    }
+  }, [cartItems, isLoading, serviceAvailable])
 
   // Remove item from cart
-  const removeItem = (id: string, size: string) => {
-    setCartItems(prevItems => 
-      prevItems.filter(item => !(item.id === id && item.size === size))
-    )
+  const removeItem = async (id: string, size: string) => {
+    const newItems = cartItems.filter(item => !(item.id === id && item.size === size))
+    setCartItems(newItems)
+    
+    // Trigger header update
+    window.dispatchEvent(new Event('cartUpdated'))
+    
+    // Also remove from service
+    if (serviceAvailable) {
+      try {
+        const sessionId = getSessionId()
+        await fetch(`${CART_SERVICE_URL}/api/cart/${sessionId}/item/${id}/${size}`, {
+          method: 'DELETE'
+        })
+      } catch (err) {
+        console.log('Failed to remove from cart service:', err)
+      }
+    }
   }
 
   // Update quantity
-  const updateQuantity = (id: string, size: string, newQuantity: number) => {
+  const updateQuantity = async (id: string, size: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeItem(id, size)
       return
     }
     
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === id && item.size === size
-          ? { ...item, quantity: newQuantity }
-          : item
-      )
+    const newItems = cartItems.map(item =>
+      item.id === id && item.size === size
+        ? { ...item, quantity: newQuantity }
+        : item
     )
+    setCartItems(newItems)
+    
+    // Trigger header update
+    window.dispatchEvent(new Event('cartUpdated'))
+    
+    // Also update in service
+    if (serviceAvailable) {
+      try {
+        const sessionId = getSessionId()
+        await fetch(`${CART_SERVICE_URL}/api/cart/${sessionId}/item/${id}/${size}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: newQuantity })
+        })
+      } catch (err) {
+        console.log('Failed to update cart service:', err)
+      }
+    }
   }
 
   const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem' }}>
+        <p style={{ fontSize: '1.2rem', color: '#666' }}>Loading cart...</p>
+      </div>
+    )
+  }
 
   return (
     <div>
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}>
         Shopping Cart ({cartItems.length} items)
       </h1>
+      
+      {/* Service status indicator */}
+      {serviceAvailable !== null && (
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.5rem 1rem',
+          borderRadius: '20px',
+          fontSize: '0.85rem',
+          marginBottom: '1rem',
+          background: serviceAvailable ? '#d4edda' : '#fff3cd',
+          color: serviceAvailable ? '#155724' : '#856404'
+        }}>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: serviceAvailable ? '#28a745' : '#ffc107'
+          }} />
+          {serviceAvailable ? 'Connected to Cart Service' : 'Local Mode (Service Offline)'}
+        </div>
+      )}
       
       {cartItems.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
@@ -155,7 +298,6 @@ const CartPage: React.FC = () => {
                     border: '1px solid #eee'
                   }}
                   onError={(e) => {
-                    // Fallback to a default image if the original fails
                     const target = e.target as HTMLImageElement
                     target.src = 'https://via.placeholder.com/80x60?text=Product'
                   }}
@@ -266,13 +408,14 @@ const CartPage: React.FC = () => {
                   Continue Shopping
                 </button>
               </Link>
-              <button 
-                className="btn btn-primary" 
-                style={{ flex: 1 }}
-                onClick={() => alert('🚀 Checkout functionality - would integrate with payment processor')}
-              >
-                Proceed to Checkout
-              </button>
+              <Link to="/checkout" style={{ flex: 1 }}>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%' }}
+                >
+                  Proceed to Checkout
+                </button>
+              </Link>
             </div>
           </div>
         </div>

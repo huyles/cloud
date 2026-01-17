@@ -109,3 +109,6 @@ packaged-template.json
 
 # IDE-Specific
 .agent/
+
+# Lock files
+*.lock
