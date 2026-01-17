@@ -1,0 +1,111 @@
+# ==================================
+# Dependencies
+# ==================================
+node_modules/
+.pnp/
+.pnp.js
+
+# ==================================
+# Build Output
+# ==================================
+dist/
+dist-ssr/
+build/
+*.local
+
+# ==================================
+# Environment Variables
+# ==================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# ==================================
+# Logs
+# ==================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==================================
+# Editor & IDE
+# ==================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ==================================
+# OS Generated Files
+# ==================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==================================
+# Testing
+# ==================================
+coverage/
+.nyc_output/
+
+# ==================================
+# TypeScript
+# ==================================
+*.tsbuildinfo
+
+# ==================================
+# Vite
+# ==================================
+.vite/
+
+# ==================================
+# Docker
+# ==================================
+# Ignore Docker override files (if any)
+docker-compose.override.yml
+
+# ==================================
+# AWS / CloudFormation
+# ==================================
+# CDK output
+cdk.out/
+# SAM build artifacts
+.aws-sam/
+# Packaged CloudFormation templates
+packaged-template.yaml
+packaged-template.json
+
+# ==================================
+# Miscellaneous
+# ==================================
+*.cache
+.cache/
+.temp/
+.tmp/
+
+# Debug files
+*.pem
+
+# Local Netlify folder
+.netlify/
+
+# Vercel
+.vercel/
+
+# IDE-Specific
+.agent/
