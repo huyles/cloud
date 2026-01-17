@@ -202,4 +202,11 @@ const HomePage: React.FC = () => {
           fontSize: '0.9rem',
           color: '#666'
         }}>
-          🔧 Debug: Loa
+          🔧 Debug: Loaded {products.length} products
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default HomePage
