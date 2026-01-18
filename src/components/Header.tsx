@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import AuthButton from './AuthButton'
 
-const Header: React.FC = () => {
+const Header = () => {
   const [cartCount, setCartCount] = useState(0)
 
-  // Update cart count when localStorage changes
   useEffect(() => {
     const updateCartCount = () => {
       const savedCart = localStorage.getItem('flashdrop-cart')
@@ -21,13 +21,8 @@ const Header: React.FC = () => {
       }
     }
 
-    // Initial load
     updateCartCount()
-
-    // Listen for storage changes (when cart is updated)
     window.addEventListener('storage', updateCartCount)
-    
-    // Custom event for same-tab updates
     window.addEventListener('cartUpdated', updateCartCount)
 
     return () => {
@@ -68,6 +63,9 @@ const Header: React.FC = () => {
                   </span>
                 )}
               </Link>
+            </li>
+            <li>
+              <AuthButton />
             </li>
           </ul>
         </nav>
