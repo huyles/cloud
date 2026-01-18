@@ -11,7 +11,6 @@ const ProductPage: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState('')
   const [isReserving, setIsReserving] = useState(false)
   const [reservationStatus, setReservationStatus] = useState<string | null>(null)
-  const [saleStatus, setSaleStatus] = useState<string>('none') // Track sale status changes
 
   // Load product data
   useEffect(() => {
@@ -172,16 +171,13 @@ const ProductPage: React.FC = () => {
           )}
           
           {/* Flash Sale Timer */}
-          {product.flashSale && (
+          {product.flashSale && isFlashSaleActive(product.flashSale) && (
             <div style={{ marginBottom: '1rem' }}>
               <FlashSaleTimer 
-                flashSale={product.flashSale}
-                onStatusChange={(status) => {
-                  setSaleStatus(status) // Update sale status to trigger price recalculation
-                  // Refresh inventory when flash sale status changes
-                  if (status === 'active' || status === 'ended') {
-                    getLiveInventory(product.id).then(setLiveInventory)
-                  }
+                endTime={product.flashSale.endTime}
+                onExpire={() => {
+                  // Refresh inventory when flash sale ends
+                  getLiveInventory(product.id).then(setLiveInventory)
                 }}
               />
             </div>
