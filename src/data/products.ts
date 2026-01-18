@@ -3,6 +3,9 @@ const BROWSE_API = import.meta.env.VITE_BROWSE_API_URL || ''
 const INVENTORY_API = import.meta.env.VITE_INVENTORY_API_URL || ''
 const S3_BUCKET = import.meta.env.VITE_S3_BUCKET_URL || ''
 
+// Import auth functions
+// Note: We can't use hooks directly in utility functions, so we'll need to pass auth headers from components
+
 // Flash sale interface
 export interface FlashSale {
   id: string
@@ -51,13 +54,13 @@ const mockProducts: Product[] = [
     inventory: 25,
     flashSale: {
       id: 'flash-1',
-      startTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // Starts in 5 minutes
-      endTime: new Date(Date.now() + 65 * 60 * 1000).toISOString(),   // Ends in 65 minutes
+      startTime: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // Started 10 minutes ago
+      endTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(),   // Ends in 45 minutes
       originalPrice: 170,
       salePrice: 129, // 24% off - realistic sneaker sale
       maxQuantity: 100,
       soldQuantity: 75,
-      isActive: false
+      isActive: true
     }
   },
   {
@@ -81,8 +84,8 @@ const mockProducts: Product[] = [
     inventory: 10,
     flashSale: {
       id: 'flash-3',
-      startTime: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // Started 10 minutes ago
-      endTime: new Date(Date.now() + 50 * 60 * 1000).toISOString(),   // Ends in 50 minutes
+      startTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // Started 5 minutes ago
+      endTime: new Date(Date.now() + 25 * 60 * 1000).toISOString(),   // Ends in 25 minutes
       originalPrice: 220,
       salePrice: 179, // 19% off - premium sneaker sale
       maxQuantity: 50,
@@ -102,8 +105,22 @@ const mockProducts: Product[] = [
   }
 ]
 
+// Helper function to get headers with auth token
+const getAuthHeaders = async (authToken?: string): Promise<HeadersInit> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+  
+  // Add auth token if provided
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
+  }
+  
+  return headers
+}
+
 // Product browsing APIs (Lambda functions via API Gateway)
-export const fetchProducts = async (): Promise<Product[]> => {
+export const fetchProducts = async (authToken?: string): Promise<Product[]> => {
   // If no API URL configured, return mock data immediately
   if (!BROWSE_API) {
     console.log('🔧 Using mock data - no API configured')
@@ -111,7 +128,8 @@ export const fetchProducts = async (): Promise<Product[]> => {
   }
 
   try {
-    const response = await fetch(`${BROWSE_API}/products`)
+    const headers = await getAuthHeaders(authToken)
+    const response = await fetch(`${BROWSE_API}/products`, { headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     
     const products = await response.json()
@@ -127,7 +145,7 @@ export const fetchProducts = async (): Promise<Product[]> => {
   }
 }
 
-export const fetchProductById = async (id: string): Promise<Product | null> => {
+export const fetchProductById = async (id: string, authToken?: string): Promise<Product | null> => {
   // If no API URL configured, return mock data immediately
   if (!BROWSE_API) {
     console.log('🔧 Using mock data - no API configured')
@@ -135,7 +153,8 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
   }
 
   try {
-    const response = await fetch(`${BROWSE_API}/products/${id}`)
+    const headers = await getAuthHeaders(authToken)
+    const response = await fetch(`${BROWSE_API}/products/${id}`, { headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     
     const product = await response.json()
@@ -152,7 +171,7 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
 }
 
 // Real-time inventory APIs (ECS service via API Gateway)
-export const getLiveInventory = async (productId: string): Promise<number> => {
+export const getLiveInventory = async (productId: string, authToken?: string): Promise<number> => {
   // If no API URL configured, return mock inventory immediately
   if (!INVENTORY_API) {
     const product = mockProducts.find(p => p.id === productId)
@@ -160,7 +179,8 @@ export const getLiveInventory = async (productId: string): Promise<number> => {
   }
 
   try {
-    const response = await fetch(`${INVENTORY_API}/inventory/${productId}`)
+    const headers = await getAuthHeaders(authToken)
+    const response = await fetch(`${INVENTORY_API}/inventory/${productId}`, { headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     
     const data = await response.json()
@@ -173,7 +193,7 @@ export const getLiveInventory = async (productId: string): Promise<number> => {
 }
 
 // Inventory reservation (ECS service with locking)
-export const reserveItem = async (productId: string, size: string, quantity: number = 1) => {
+export const reserveItem = async (productId: string, size: string, quantity: number = 1, authToken?: string) => {
   // If no API URL configured, return mock success immediately
   if (!INVENTORY_API) {
     console.log('🔧 Mock reservation - no API configured')
@@ -186,11 +206,10 @@ export const reserveItem = async (productId: string, size: string, quantity: num
   }
 
   try {
+    const headers = await getAuthHeaders(authToken)
     const response = await fetch(`${INVENTORY_API}/reserve`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         productId,
         size,
