@@ -224,3 +224,260 @@ body {
     gap: 1rem;
   }
 }
+/* Homepage Container */
+.homepage-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Main Header */
+.main-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.main-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.main-subtitle {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.flash-sale-indicator {
+  display: inline-block;
+  background: #ff4757;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Products Container */
+.products-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Product Item */
+.product-item {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+/* Flash Sale Badge */
+.flash-sale-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: #ff6b6b;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+/* Flash Sale Timer */
+.flash-sale-timer {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #ff6b6b;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-align: center;
+  z-index: 2;
+}
+
+.flash-sale-timer .timer-label {
+  display: none; /* Hide the label in compact view */
+}
+
+.flash-sale-timer .timer-value {
+  font-size: 0.75rem;
+  color: white;
+}
+
+.timer-value-only {
+  font-size: 0.75rem;
+  color: white;
+  font-weight: bold;
+}
+
+.flash-sale-timer-expired {
+  font-size: 0.75rem;
+  color: white;
+  font-weight: bold;
+}
+
+.stock-info {
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+  opacity: 0.9;
+}
+
+/* Product Image */
+.product-image-wrapper {
+  text-align: center;
+  margin: 2rem 0 1.5rem 0;
+}
+
+.product-image {
+  width: 100%;
+  max-width: 250px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* Product Details */
+.product-details {
+  text-align: center;
+}
+
+.product-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+/* Price Section */
+.price-section {
+  margin-bottom: 0.5rem;
+}
+
+.sale-price {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #ff6b6b;
+  margin-right: 0.5rem;
+}
+
+.original-price {
+  font-size: 1rem;
+  color: #999;
+  text-decoration: line-through;
+}
+
+.regular-price {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.savings-badge {
+  display: inline-block;
+  background: #28a745;
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+}
+
+/* Stock Status */
+.stock-status {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+/* View Details Button */
+.view-details-btn {
+  width: 100%;
+  background: #000;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.view-details-btn:hover {
+  background: #333;
+}
+
+/* Loading Styles */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ff6b6b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 2rem;
+  }
+  
+  .products-container {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .product-item {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .homepage-container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .products-container {
+    grid-template-columns: 1fr;
+  }
+}
