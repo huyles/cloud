@@ -1,61 +1,56 @@
 import React, { useState, useEffect } from 'react'
-import { FlashSale, getFlashSaleStatus, formatTimeRemaining } from '../data/products'
+import { formatTimeRemaining } from '../data/products'
 
 interface FlashSaleTimerProps {
-  flashSale: FlashSale
-  onStatusChange?: (status: string) => void
+  endTime: string
+  onExpire?: () => void
+  compact?: boolean // New prop for compact display
 }
 
-export const FlashSaleTimer: React.FC<FlashSaleTimerProps> = ({ 
-  flashSale, 
-  onStatusChange 
-}) => {
-  const [status, setStatus] = useState(getFlashSaleStatus(flashSale))
-  
+const FlashSaleTimer: React.FC<FlashSaleTimerProps> = ({ endTime, onExpire, compact = false }) => {
+  const [timeRemaining, setTimeRemaining] = useState<number>(0)
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newStatus = getFlashSaleStatus(flashSale)
-      setStatus(newStatus)
+    const calculateTimeRemaining = () => {
+      const now = new Date().getTime()
+      const end = new Date(endTime).getTime()
+      const remaining = end - now
       
-      if (onStatusChange) {
-        onStatusChange(newStatus.status)
+      if (remaining <= 0) {
+        setTimeRemaining(0)
+        if (onExpire) onExpire()
+        return
       }
-    }, 1000)
-    
+      
+      setTimeRemaining(remaining)
+    }
+
+    calculateTimeRemaining()
+    const interval = setInterval(calculateTimeRemaining, 1000)
+
     return () => clearInterval(interval)
-  }, [flashSale, onStatusChange])
-  
-  if (status.status === 'none' || status.status === 'ended') return null
-  
-  // Compact inline display
+  }, [endTime, onExpire])
+
+  if (timeRemaining <= 0) {
+    return (
+      <span className="flash-sale-timer-expired">
+        {compact ? "Ended" : "🚫 Flash sale ended"}
+      </span>
+    )
+  }
+
+  if (compact) {
+    return (
+      <span className="timer-value-only">
+        Ends in {formatTimeRemaining(timeRemaining)}
+      </span>
+    )
+  }
+
   return (
-    <div style={{ 
-      fontSize: '0.85rem', 
-      fontWeight: '600',
-      marginBottom: '0.5rem'
-    }}>
-      {status.status === 'upcoming' && status.timeUntilStart && (
-        <div style={{ color: '#2563eb' }}>
-          ⏰ Sale starts in {formatTimeRemaining(status.timeUntilStart)}
-        </div>
-      )}
-      
-      {status.status === 'active' && (
-        <div style={{ color: '#dc2626' }}>
-          <div>🔥 Ends in {status.timeUntilEnd ? formatTimeRemaining(status.timeUntilEnd) : 'soon'}</div>
-          {status.remaining && (
-            <div style={{ fontSize: '0.8rem', color: '#7c2d12', marginTop: '0.2rem' }}>
-              Only {status.remaining} left!
-            </div>
-          )}
-        </div>
-      )}
-      
-      {status.status === 'sold_out' && (
-        <div style={{ color: '#dc2626', fontWeight: 'bold' }}>
-          🚫 Flash sale sold out
-        </div>
-      )}
+    <div className="flash-sale-timer">
+      <span className="timer-label">⏰ Ends in:</span>
+      <span className="timer-value">{formatTimeRemaining(timeRemaining)}</span>
     </div>
   )
 }
