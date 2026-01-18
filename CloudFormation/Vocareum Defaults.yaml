@@ -1,0 +1,1217 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: associate Learner Lab template (academy)
+
+Resources:
+
+  # EKS Cluster IAM Role
+  LabEksClusterRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+              - 'sts:TagSession'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSBlockStoragePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSComputePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSLoadBalancingPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSNetworkingPolicy'
+
+  # EKS Node IAM Role
+  LabEksNodeRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+        
+  LabRole:
+    Type: 'AWS::IAM::Role'
+    DeletionPolicy: Retain
+    Properties:
+      RoleName: LabRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+                - application-autoscaling.amazonaws.com
+                - athena.amazonaws.com
+                - autoscaling.amazonaws.com
+                - batch.amazonaws.com
+                - backup.amazonaws.com
+                - cloud9.amazonaws.com
+                - cloudformation.amazonaws.com
+                - cloudtrail.amazonaws.com
+                - codecommit.amazonaws.com
+                - codedeploy.amazonaws.com
+                - codewhisperer.amazonaws.com
+                - cognito-idp.amazonaws.com
+                - credentials.iot.amazonaws.com
+                - databrew.amazonaws.com
+                - deepracer.amazonaws.com
+                - dynamodb.amazonaws.com
+                - ec2.amazonaws.com
+                - ec2.application-autoscaling.amazonaws.com
+                - ecs.amazonaws.com
+                - ecs-tasks.amazonaws.com
+                - eks.amazonaws.com
+                - eks-fargate-pods.amazonaws.com
+                - elasticbeanstalk.amazonaws.com
+                - elasticfilesystem.amazonaws.com
+                - elasticloadbalancing.amazonaws.com
+                - elasticmapreduce.amazonaws.com
+                - events.amazonaws.com
+                - firehose.amazonaws.com
+                - forecast.amazonaws.com
+                - glue.amazonaws.com
+                - iot.amazonaws.com
+                - iotanalytics.amazonaws.com
+                - iotevents.amazonaws.com
+                - kinesis.amazonaws.com
+                - kinesisanalytics.amazonaws.com
+                - kms.amazonaws.com
+                - lambda.amazonaws.com
+                - logs.amazonaws.com
+                - pipes.amazonaws.com
+                - rds.amazonaws.com
+                - redshift.amazonaws.com
+                - rekognition.amazonaws.com
+                - resource-groups.amazonaws.com
+                - s3.amazonaws.com
+                - sagemaker.amazonaws.com
+                - scheduler.amazonaws.com
+                - secretsmanager.amazonaws.com
+                - servicecatalog.amazonaws.com
+                - sns.amazonaws.com
+                - sqs.amazonaws.com
+                - ssm.amazonaws.com
+                - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+
+  LabInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    DeletionPolicy: Retain
+    Properties:
+      InstanceProfileName: LabInstanceProfile
+      Path: /
+      Roles:
+        - !Ref LabRole
+
+  myRedshiftRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    Properties:
+      RoleName: "myRedshiftRole"
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - redshift.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  RedshiftIAMLabPolicy:
+    Type: AWS::IAM::Policy
+    DeletionPolicy: Retain
+    DependsOn: myRedshiftRole
+    Properties:
+      PolicyName: RedshiftIAMLabPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:DescribeVpcs'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribeAddresses'
+              - 'ec2:AssociateAddress'
+              - 'ec2:DisassociateAddress'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:ModifyNetworkInterfaceAttribute'
+            Resource: '*'
+      Roles:
+      - !Ref myRedshiftRole
+
+  ##RedshiftOverwatch - 8 resources 
+  RedshiftRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    Properties:
+      RoleName: RedshiftRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: "Iam_Policies"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - redshift:DeleteCluster
+                  - redshift:DescribeClusters
+                  - redshift:CreateEventSubscription
+                  - redshift:DeleteEventSubscription
+                  - redshift:ModifyEventSubscription
+                  - redshift:CreateTags
+                Resource:
+                  - "*"
+  
+  RedshiftOverwatch:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: RedshiftOverwatch
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+          from datetime import datetime
+          import urllib3
+          import random
+          import logging
+          http = urllib3.PoolManager()
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          allowed_node_size = ['ra3.large']
+          allowed_node_count = 2
+          redshift_client = boto3.client('redshift')
+          def lambda_handler(event, context):
+              logger.info(event)
+              try:
+                  response_describe_redshift = redshift_client.describe_clusters()
+                  logger.info(response_describe_redshift)
+                  redshift_cluster_list = []
+                  # Get list of redshift clusters and delete if the node size is different.
+                  for item in response_describe_redshift['Clusters']:
+                      cluster = item.get('ClusterIdentifier')
+                      node_type = item.get('NodeType')
+                      for size in allowed_node_size:
+                        if node_type != size:
+                            logger.info("Not allowed size")
+                            delete_cluster(cluster)
+                        elif item.get('NumberOfNodes') > allowed_node_count:
+                            logger.info("Node count is more than allowed value")
+                            delete_cluster(cluster)
+                        else:
+                            redshift_cluster_list.append(cluster)
+                  logger.info(redshift_cluster_list)
+                  try:
+                      # Generate random number
+                      if len(redshift_cluster_list) < 2:
+                          rand_num = 1
+                      else:
+                          rand_num = random.randint(0,len(redshift_cluster_list)-1)
+                          logger.info(rand_num)
+                      # If the cluster count is more than 1, random cluster will be deleted.
+                      if len(redshift_cluster_list) > 1:
+                          logger.info('bad and we are deleting:'+redshift_cluster_list[rand_num])
+                          delete_cluster(redshift_cluster_list[rand_num])
+                      else:
+                          logger.info('good - no need to delete')
+                  except Exception as exp:
+                      logger.exception(exp)
+              except Exception as exp:
+                  logger.exception(exp)
+          # Function to delete Cluster
+          def delete_cluster(ClusterID):
+              try:
+                  response_delete = redshift_client.delete_cluster(
+                      ClusterIdentifier=ClusterID,
+                      SkipFinalClusterSnapshot=True
+                      )
+                  logger.info(response_delete)
+              except  Exception as exp:
+                  logger.exception(exp)
+      Description: Deletes Redshift Cluster if the count is more than 2.
+      Handler: index.lambda_handler
+      Role: !GetAtt RedshiftRole.Arn
+      MemorySize: 128
+      Timeout: 60
+      Runtime: python3.10
+  
+  RedshiftSNS:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    Properties:
+      TopicName: "RedshiftSNS"
+      Subscription:
+        - Endpoint:
+            Fn::GetAtt:
+              - "RedshiftOverwatch"
+              - "Arn"
+          Protocol: "lambda" 
+  
+  SNSTopicPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: !Ref RedshiftOverwatch
+      Action: "lambda:InvokeFunction"
+      Principal: "sns.amazonaws.com"
+      SourceArn: !Ref RedshiftSNS
+  
+  resourceFunctionRule: 
+    Type: AWS::Events::Rule
+    DeletionPolicy: Retain
+    Properties:
+      Name: "resourceFunctionRule"
+      EventPattern: 
+        source: 
+          - "aws.redshift"
+        detail-type: 
+          - "AWS API Call via CloudTrail"
+        detail: 
+          eventSource:
+            - redshift.amazonaws.com
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt RedshiftOverwatch.Arn
+          Id: !Ref RedshiftOverwatch
+
+  resourceFunctionRulePermission: 
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties: 
+      FunctionName: !Ref RedshiftOverwatch
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt resourceFunctionRule.Arn 
+  
+  RedshiftEventSubscription:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: RedshiftEventSubscription
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+          from datetime import datetime
+          import urllib3
+          import random
+          import logging
+          http = urllib3.PoolManager()
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          SUCCESS = "SUCCESS"
+          FAILED = "FAILED"
+          def lambda_handler(event, context):
+              logger.info(event)
+              if event['RequestType'] == 'Create':
+                  resource_config = event['ResourceProperties']
+                  sns_topic = resource_config['snsTopicArn']
+                  try:
+                      #Generate random number
+                      rand_num = random.randint(0,100)
+                      logger.info(rand_num)
+                      redshift_client = boto3.client('redshift')
+                      # Create Redshift Subscription
+                      response_create_subscription = redshift_client.create_event_subscription(
+                        SubscriptionName='event-subscription-'+str(rand_num),
+                        SnsTopicArn=sns_topic,
+                        SourceType='cluster',
+                       Enabled=True,
+                       Tags=[
+                          {
+                              'Key': 'Name',
+                              'Value': 'Redshift_monitor'
+                          },
+                       ]
+                      )
+                      send(event, context, SUCCESS, {},physicalResourceId=event['LogicalResourceId'])
+                  except Exception as exp:
+                      logger.exception(exp)
+                      send(event, context, SUCCESS,{}, physicalResourceId='12345678')
+              else:
+                  logger.info("nothing to do")
+                  send(event, context, SUCCESS,{}, physicalResourceId='12345678')
+          def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False, error=None):
+              responseUrl = event['ResponseURL']
+              logger.info(responseUrl)
+              responseBody = {}
+              responseBody['Status'] = responseStatus
+              if error is None: 
+                responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name + ' LogGroup: ' + context.log_group_name
+              else:
+                responseBody['Reason'] = error
+              responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
+              responseBody['StackId'] = event['StackId']
+              responseBody['RequestId'] = event['RequestId']
+              responseBody['LogicalResourceId'] = event['LogicalResourceId']
+              responseBody['NoEcho'] = noEcho
+              responseBody['Data'] = responseData
+              json_responseBody = json.dumps(responseBody)
+              print("Response body:\n" + json_responseBody)
+              headers = {
+                  'content-type' : '',
+                  'content-length' : str(len(json_responseBody))
+              }
+              try:
+                  response = http.request('PUT',responseUrl,body=json_responseBody.encode('utf-8'),headers=headers)
+                  print("Status code: " + response.reason)
+              except Exception as e:
+                  print("send(..) failed executing requests.put(..): " + str(e))
+      Description: Create Redshift event subscription to SNS Topic.
+      Handler: index.lambda_handler
+      Role: !GetAtt RedshiftRole.Arn
+      MemorySize: 128
+      Timeout: 60
+      Runtime: python3.10
+  
+  InvokeRedshiftEventSubscription:
+    Type: 'Custom::InvokeRedshiftEventSubscription'
+    DeletionPolicy: Retain
+    Properties:
+      ServiceToken: !GetAtt RedshiftEventSubscription.Arn
+      snsTopicArn: !Ref RedshiftSNS          
+  ##End redshift overwatch
+
+  #Start EMR notebook service role creation
+  InvokeRCF:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: RoleCreationFunction
+    Version: "1.0"
+    Properties:
+      ServiceToken: !GetAtt RoleCreationFunction.Arn
+
+  RoleCreationFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      Description: Create SLR if absent
+      FunctionName: RoleCreationFunction
+      Handler: index.lambda_handler
+      Role: !GetAtt 'LambdaSLRRole.Arn'
+      Runtime: python3.10
+      Timeout: 300
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import json
+          import time 
+          import cfnresponse
+          def lambda_handler(event, context):
+            session = boto3.Session()
+            iam_client = session.client('iam')
+            response = iam_client.list_roles()
+            notebookRoleFound = False
+            for i in response['Roles']:
+                if i['RoleName'] == "EMR_Notebooks_DefaultRole":
+                    notebookRoleFound = True
+            if notebookRoleFound != True:
+                TrustPolicy = {"Version": "2008-10-17","Statement": [{"Effect": "Allow","Principal": {"Service": "elasticmapreduce.amazonaws.com"},"Action": "sts:AssumeRole"}]}
+                create_role_response = iam_client.create_role(
+                    Path='/',
+                    RoleName='EMR_Notebooks_DefaultRole',
+                    AssumeRolePolicyDocument=json.dumps(TrustPolicy),
+                    Description='EMR_Notebooks_DefaultRole'
+                )
+                time.sleep(3)
+                attach_role_response = iam_client.attach_role_policy(
+                    RoleName='EMR_Notebooks_DefaultRole',
+                    PolicyArn='arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceEditorsRole'
+                )
+                attach_role_response = iam_client.attach_role_policy(
+                    RoleName='EMR_Notebooks_DefaultRole',
+                    PolicyArn='arn:aws:iam::aws:policy/AmazonS3FullAccess'
+                )
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {"test_response_1": "It worked"})
+     
+  LambdaSLRRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: createservicerole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+              - Effect: Allow
+                Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - iam:AttachRolePolicy
+                  - iam:CreateRole
+                  - iam:CreateServiceLinkedRole
+                  - iam:ListRoles
+                  - iam:PutRolePolicy
+                  - iam:UpdateServiceLinkedRole
+                  - lambda:AddPermission
+                Resource: '*'
+              - Action:
+                  - iam:ListRolePolicies
+                Effect: Allow
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*RoleCreationFunction*
+  #End EMR notebook service role creation
+
+  # Function to delete unauthorized EC2 instances.
+  MainMonitoringFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: MainMonitoringFunction
+      Handler: index.lambda_handler
+      Role: !GetAtt 'LabRole.Arn'
+      Runtime: python3.10
+      Timeout: 300
+      Code:
+        ZipFile: !Sub |
+          import boto3
+
+          def terminate_instance(instance_region, InstanceId):
+            try:
+                ec2_client = boto3.client('ec2', region_name=instance_region)
+                response = ec2_client.terminate_instances(
+                    InstanceIds=[
+                        InstanceId
+                    ],
+                #DryRun=True
+                )
+                print(f"Terminating instance {InstanceId}.\nResponse is {response}")
+            except Exception as exception:
+                print(f"Encountered exception: {exception}")
+
+          def lambda_handler(event, context):
+            try:
+                #print(f"Event: {event}")
+                # EC2 Section - c4.xlarge allowed for c9 and robo
+                allowed_types = ['nano', 'micro', 'small', 'medium', 'large', 'xlarge']
+                instance_region = event['region']
+                ec2_client = boto3.client('ec2', region_name=instance_region)
+                InstanceId = event['detail']['instance-id']
+                response = ec2_client.describe_instances(
+                    InstanceIds=[
+                        InstanceId,
+                        ]
+                )
+                for inst in response['Reservations'][0]['Instances']:
+                    instance_type = response['Reservations'][0]['Instances'][0]['InstanceType']
+                    instance_size = instance_type.split('.')[1]
+                    #Terminate the instance if not one of the allowed sizes
+                    if instance_size not in allowed_types:
+                        print("Instance size is not nano, micro, small, medium, large, or xlarge. It will be terminated...")
+                        terminate_instance(instance_region, InstanceId)
+
+            except Exception as exception:
+                print(f"Encountered exception: {exception}")
+
+            print("All operations have completed.")
+
+  EventRule:
+    Type: AWS::Events::Rule
+    DeletionPolicy: Retain
+    Properties:
+      Name: "MonitoringRule"
+      Description: "MonitoringRule"
+      EventPattern:
+        source:
+          - "aws.ec2"
+        detail-type:
+          - "EC2 Instance State-change Notification"
+        detail:
+          state:
+            - "pending"
+      State: "ENABLED"
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
+              - "MainMonitoringFunction"
+              - "Arn"
+          Id: "TargetFunctionV1"
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName:
+        Ref: "MainMonitoringFunction"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt:
+          - "EventRule"
+          - "Arn"
+
+  ModLabRole:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: ModLabRole
+      Code:
+        ZipFile: !Sub |
+          import json
+          import boto3
+          import cfnresponse
+          def lambda_handler(event, context):
+            account_id=boto3.client('sts').get_caller_identity().get('Account')
+            inject_str='"Principal": { "AWS": ["arn:aws:iam::ACTUAL-ACCOUNT-ID:role/LabRole"],'
+            inject_str = inject_str.replace('ACTUAL-ACCOUNT-ID', account_id)
+            #print('inject_str = ' + inject_str)
+            client = boto3.client('iam')
+            response = client.get_role(RoleName='LabRole')
+            #print(json.dumps(response, indent=4, default=str))
+            document = str(response['Role']['AssumeRolePolicyDocument'])
+            document = document.replace("'","\"")
+            document = document.replace('"Principal": {', inject_str)
+            #print('new doc = ' + document)
+            response = client.update_assume_role_policy(RoleName='LabRole',PolicyDocument=document)
+            #BOILER PLATE BELOW
+            responseData = {}
+            responseData['Data'] = 'success'
+            response_status = cfnresponse.SUCCESS
+            #logger.info('Sending responseData: {}'.format(json.dumps(responseData)))
+            cfnresponse.send(event, context, response_status, responseData )
+      Description: updates LabRole to allow it to assume itself
+      Handler: index.lambda_handler
+      Role: !GetAtt RoleForLambdaModLabRole.Arn
+      MemorySize: 128
+      Timeout: 60
+      Runtime: python3.10
+
+  RoleForLambdaModLabRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    Properties:
+      RoleName: RoleForLambdaModLabRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: "ModLabRole"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:Get*
+                  - iam:UpdateRole
+                  - iam:UpdateAssumeRolePolicy
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
+
+  # Cfn invoke ModLabRole
+  Custom1:
+    Type: Custom::InvokeLambda
+    DependsOn:
+    - LabRole
+    - RoleForLambdaModLabRole
+    - ModLabRole
+    Properties:
+      ServiceToken: !GetAtt ModLabRole.Arn
+
+  VocLabPolicy1:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    Properties:
+      Description: String
+      Roles:
+        - !Ref LabRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement: [
+          {
+            "Sid": "AllowAllActions1",
+            "Effect": "Allow",
+            "Action": [
+                "acm:*",
+                "acm-pca:ListCertificateAuthorities",
+                "amplify:*",
+                "amplifybackend:*",
+                "apigateway:*",
+                "application-autoscaling:*",
+                "appmesh:*",
+                "arsenal:RegisterOnPremisesAgent",
+                "artifact:*",
+                "athena:*",
+                "autoscaling:*",
+                "aws-marketplace:ViewSubscriptions",
+                "backup:*",
+                "backup-storage:*",
+                "batch:*",
+                "ce:*",
+                "cloud9:*",
+                "cloudformation:*",
+                "cloudshell:*",
+                "cloudtrail:*",
+                "cloudwatch:*",
+                "codecommit:*",
+                "codedeploy:*",
+                "codepipeline:*",
+                "codestar-notifications:*",
+                "codewhisperer:GenerateRecommendations",
+                "cognito-identity:*",
+                "cognito-idp:*",
+                "cognito-sync:*",
+                "compute-optimizer:GetEnrollmentStatus",
+                "config:*",
+                "cur:*",
+                "databrew:*",
+                "deepcomposer:*",
+                "deeplens:*",
+                "deepracer:*",
+                "dms:*",
+                "ds:*",
+                "dynamodb:*",
+                "ebs:*",
+                "ec2:*",
+                "ec2messages:*",
+                "ec2-instance-connect:Send*",
+                "ecr:*",
+                "ecs:*",
+                "eks:*",
+                "elasticbeanstalk:*",
+                "elasticache:*",
+                "elasticfilesystem:*",
+                "elasticloadbalancing:*",
+                "elasticmapreduce:*",
+                "emr-containers:*",
+                "events:*",
+                "execute-api:*"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": [
+                        "us-east-1",
+                        "us-west-2"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "AllowAllActions2",
+            "Effect": "Allow",
+            "Action": [
+                "firehose:*",
+                "glacier:*",
+                "glue:*",
+                "greengrass:*",
+                "groundtruthlabeling:*",
+                "guardduty:*",
+                "health:*",
+                "inspector:*",
+                "iot1click:*",
+                "iot:*",
+                "iotevents:*",
+                "kinesis:*",
+                "kinesisanalytics:*",
+                "kms:*",
+                "lambda:*",
+                "logs:*",
+                "machinelearning:*",
+                "mobilehub:*",
+                "opsworks:*",
+                "pipes:*Pipe*",
+                "pipes:*Resource",
+                "q:GetConversation",
+                "q:GetTroubleshootingResults",
+                "q:SendMessage",
+                "q:StartConversation",
+                "q:StartTroubleshootingAnalysis",
+                "q:StartTroubleshootingResolutionExplanation",
+                "rds:*ActivityStream",
+                "rds:*Backup*",
+                "rds:*Cluster",
+                "rds:*DBProxy*",
+                "rds:*Event*",
+                "rds:*Export*",
+                "rds:*Group*",
+                "rds:*MaintenanceAction",
+                "rds:*Region*",
+                "rds:*Snapshot*",
+                "rds:*Tag*",
+                "rds:Add*",
+                "rds:CreateCustomDBEngineVersion",
+                "rds:CreateDBClusterEndpoint",
+                "rds:Delete*",
+                "rds:Describe*",
+                "rds:Download*",
+                "rds:ModifyCertificates",
+                "rds:ModifyCustomDBEngineVersion",
+                "rds:ModifyDBClusterEndpoint",
+                "rds:ModifyRecommendation",
+                "rds:Promote*",
+                "rds:Reboot*",
+                "rds:Remove*",
+                "rds:Restore*",
+                "rds:StopDB*",
+                "rds-data:*",
+                "redshift:*",
+                "redshift-data:*",
+                "redshift-serverless:List*",
+                "rekognition:*",
+                "resource-groups:*",
+                "route53:*",
+                "s3:*",
+                "sagemaker:*",
+                "scheduler:*",
+                "secretsmanager:*",
+                "securityhub:*",
+                "serverlessrepo:*",
+                "servicecatalog:*",
+                "servicediscovery:ListNamespaces",
+                "servicequotas:List*",
+                "sns:*",
+                "sqlworkbench:*",
+                "sqs:*",
+                "ssm:*",
+                "ssmmessages:*",
+                "states:*",
+                "sts:AssumeRole",
+                "sts:Get*",
+                "swf:*",
+                "tag:*",
+                "textract:*",
+                "trustedadvisor:*",
+                "waf:*",
+                "waf-regional:*",
+                "wafv2:*",
+                "wellarchitected:*"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": [
+                        "us-east-1",
+                        "us-west-2"
+                    ]
+                }
+            }
+        }]
+
+  VocLabPolicy2:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    Properties:
+      Description: String
+      Roles:
+        - !Ref LabRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement: [
+          {
+            "Sid": "IamAllowPassLabRole",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/LabRole",
+                "arn:aws:iam::*:role/LabInstanceProfile",
+                "arn:aws:iam::*:role/aws-service-role/*.amazonaws.com/*",
+                "arn:aws:iam::*:role/EMR_DefaultRole",
+                "arn:aws:iam::*:role/EMR_DefaultRole_V2",
+                "arn:aws:iam::*:role/EMR_EC2_DefaultRole",
+                "arn:aws:iam::*:role/EMR_AutoScaling_DefaultRole",
+                "arn:aws:iam::*:role/myRedshiftRole"
+            ],
+            "Condition": {
+                "StringLike": {
+                    "iam:PassedToService": [
+                        "*.amazonaws.com"
+                    ]
+                }
+            }
+          },
+          {
+            "Effect": "Allow",
+            "Action": "iam:PassRole",
+            "Resource": [
+                "arn:aws:iam::*:role/EMR_Notebooks_DefaultRole",
+                "arn:aws:iam::*:role/LabRole"
+            ]
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+                "iam:PutRolePolicy",
+                "iam:GetRolePolicy"
+            ],
+            "Resource": "arn:aws:iam::*:role/aws-service-role/*.amazonaws.com/*"
+          },
+          {
+            "Sid": "IamAllowServiceLinkedRoleCreation",
+            "Effect": "Allow",
+            "Action": "iam:CreateServiceLinkedRole",
+            "Resource": "arn:aws:iam::*:role/aws-service-role/*"
+          },
+          {
+              "Sid": "IamLimited",
+              "Effect": "Allow",
+              "Action": [
+                "iam:AddRoleToInstanceProfile",
+                "iam:CreateInstanceProfile",
+                "iam:CreatePolicy",
+                "iam:DeleteInstanceProfile",
+                "iam:DeletePolicy",
+                "iam:DeleteRole",
+                "iam:DeleteRolePolicy",
+                "iam:DeleteServiceLinkedRole",
+                "iam:Get*",
+                "iam:List*",
+                "iam:*LoginProfile",
+                "iam:Remove*",
+                "iam:Sim*",
+                "iam:UpdateRoleDescription",
+                "iam:UploadServerCertificate"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Sid": "IamNoView",
+              "Effect": "Deny",
+              "Action": [
+                  "iam:Delete*",
+                  "iam:Update*"
+              ],
+              "Resource": [
+                  "arn:aws:iam::*:policy/*VocLabPolicy*",
+                  "arn:aws:iam::*:role/LabRole",
+                  "arn:aws:iam::*:role/myRedshiftRole",
+                  "arn:aws:iam::*:role/RedshiftRole",
+                  "arn:aws:iam::*:role/LambdaSLRRole",
+                  "arn:aws:iam::*:role/RoleForLambdaModLabRole"
+              ]
+          },
+          {
+              "Sid": "PermsAndMonitoringNoView",
+              "Effect": "Deny",
+              "Action": "*",
+              "Resource": [
+                "arn:aws:events:*:*:rule/*MonitoringRule*",
+                "arn:aws:events:*:*:rule/resourceFunctionRule",
+                "arn:aws:iam::*:policy/*VocLabPolicy*",
+                "arn:aws:iam::*:role/RoleForLambdaModLabRole",
+                "arn:aws:lambda:*:*:function:*MonitoringFunction*",
+                "arn:aws:lambda:*:*:function:RedshiftOverwatch",
+                "arn:aws:lambda:*:*:function:RedshiftEventSubscription",
+                "arn:aws:lambda:*:*:function:RoleCreationFunction",
+                "arn:aws:lambda:*:*:function:ModLabRole",
+                "arn:aws:logs:*:*:log-group:/aws/lambda/*MonitoringFunction:*",
+                "arn:aws:sns:*:*:RedshiftSNS"
+              ]
+          },
+          {
+              "Sid": "AllServicesDenyNoConds",
+              "Effect": "Deny",
+              "Action": [
+                  "codebuild:Update*",
+                  "codebuild:Create*",
+                  "codebuild:Batch*",
+                  "dynamodb:*Reserved*",
+                  "ec2:*Fpga*",
+                  "ec2:*Spot*",
+                  "ec2:*ReservedInstances*",
+                  "ec2:*Scheduled*",
+                  "ec2:*Purchase*",
+                  "ec2:CreateFleet",
+                  "ec2:EnableFastSnapshotRestores",
+                  "glacier:*VaultLock",
+                  "rds:Purchase*",
+                  "redshift:AcceptReservedNodeExchange",
+                  "redshift:PurchaseReservedNodeOffering",
+                  "route53domains:RegisterDomain",
+                  "s3:*ObjectLegalHold",
+                  "s3:*ObjectRetention",
+                  "s3:PutBucketObjectLockConfiguration"
+              ],
+              "Resource": "*"
+          },
+          {
+              "Sid": "AsgRestrict",
+              "Action": [
+                  "autoscaling:CreateLaunchConfiguration"
+              ],
+              "Effect": "Deny",
+              "Resource": "*",
+              "Condition": {
+                  "ForAnyValue:StringNotLike": {
+                      "autoscaling:InstanceType": [
+                          "*.nano",
+                          "*.small",
+                          "*.micro",
+                          "*.medium",
+                          "*.large"
+                      ]
+                  }
+              }
+          },
+          {
+              "Sid": "RestrictCloud9",
+              "Effect": "Deny",
+              "Action": [
+                  "cloud9:UpdateEnvironment*",
+                  "cloud9:CreateEnvironment*"
+              ],
+              "Resource": "*",
+              "Condition": {
+                  "ForAnyValue:StringNotLikeIfExists": {
+                      "cloud9:InstanceType": [
+                          "*.nano",
+                          "*.micro",
+                          "*.small",
+                          "*.medium",
+                          "*.large",
+                          "c4.xlarge"
+                      ]
+                  }
+              }
+          },
+          {
+            "Sid": "ec2NoSpot",
+            "Effect": "Deny",
+            "Action": "ec2:RunInstances",
+            "Resource": "*",
+            "Condition": {
+                "ForAnyValue:StringEqualsIfExists": {
+                    "ec2:InstanceMarketType": "spot"
+                }
+            }
+        },
+          {
+              "Sid": "Ec2RestrictPlacementGroup",
+              "Action": "ec2:*Instance*",
+              "Effect": "Deny",
+              "Resource": "*",
+              "Condition": {
+                  "StringEquals": {
+                      "ec2:PlacementGroupStrategy": "cluster"
+                  }
+              }
+          },
+          {
+              "Sid": "Ec2DenyTenancy",
+              "Action": "ec2:*Instance*",
+              "Effect": "Deny",
+              "Resource": "arn:aws:ec2:*:*:instance/*",
+              "Condition": {
+                  "StringNotLike": {
+                      "ec2:Tenancy": "default"
+                  }
+              }
+          },
+          {
+              "Sid": "Ec2RestrictInstanceTypes",
+              "Action": [
+                  "ec2:RunInstances",
+                  "ec2:StartInstances"
+              ],
+              "Effect": "Deny",
+              "Resource": "arn:aws:ec2:*:*:instance/*",
+              "Condition": {
+                  "ForAnyValue:StringNotLike": {
+                      "ec2:InstanceType": [
+                          "*.nano",
+                          "*.micro",
+                          "*.small",
+                          "*.medium",
+                          "*.large"
+                      ]
+                  }
+              }
+          },
+          {
+              "Sid": "Ec2RestrictLargeVolumes",
+              "Action": [
+                  "ec2:RunInstances",
+                  "ec2:CreateVolume"
+              ],
+              "Effect": "Deny",
+              "Resource": "arn:aws:ec2:*:*:volume/*",
+              "Condition": {
+                  "NumericGreaterThanIfExists": {
+                      "ec2:VolumeSize": "101"
+                  }
+              }
+          },
+          {
+              "Sid": "Ec2RestrictPIOPSVolumes",
+              "Action": [
+                  "ec2:RunInstances",
+                  "ec2:CreateVolume"
+              ],
+              "Effect": "Deny",
+              "Resource": "arn:aws:ec2:*:*:volume/*",
+              "Condition": {
+                  "StringNotLikeIfExists": {
+                      "ec2:VolumeType": [
+                          "gp2",
+                          "gp3",
+                          "sc1",
+                          "standard"
+                      ]
+                  }
+              }
+          }]
+
+  VocLabPolicy3:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    Properties:
+      Description: String
+      Roles:
+        - !Ref LabRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement: [
+          {
+              "Sid": "RdsRestrictPiops",
+              "Action": [
+                  "rds:CreateDBInstance",
+                  "rds:CreateDBInstanceReadReplica",
+                  "rds:CreateGlobalCluster",
+                  "rds:StartDB*",
+                  "rds:ModifyDBCluster",
+                  "rds:ModifyCurrentDBClusterCapacity",
+                  "rds:ModifyDBInstance",
+                  "rds:ModifyGlobalCluster",
+                  "rds:RestoreDB*",
+                  "rds:RebootDBInstance"
+              ],
+              "Effect": "Deny",
+              "Resource": "*",
+              "Condition": {
+                "ForAnyValue:NumericGreaterThanIfExists": {
+                    "rds:Piops": "100",
+                    "rds:StorageSize": "101"
+                }
+              }
+          },
+          {
+              "Sid": "RdsAllowAllAsLongAs",
+              "Action": [
+                  "rds:*"
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+              "Condition": {
+                  "ForAnyValue:StringLikeIfExists": {
+                      "rds:DatabaseClass": [
+                          "*.nano",
+                          "*.small",
+                          "*.micro",
+                          "*.medium"
+                      ],
+                      "rds:DatabaseEngine": [
+                          "aurora-mysql",
+                          "aurora-postgresql",
+                          "mysql",
+                          "postgres",
+                          "mariadb",
+                          "oracle-*",
+                          "sqlserver-*"
+                      ],
+                      "aws:RequestedRegion": [
+                          "us-east-1",
+                          "us-west-2"
+                      ]
+                  }
+              }
+          },
+          {
+              "Sid": "SmAllowSpecificModelTraining",
+              "Effect": "Deny",
+              "Action": [
+                  "sagemaker:CreateApp",
+                  "sagemaker:CreateEndpointConfig",
+                  "sagemaker:CreateExperiment",
+                  "sagemaker:CreateHyperParameterTuningJob",
+                  "sagemaker:CreateModel",
+                  "sagemaker:CreateNotebookInstance",
+                  "sagemaker:CreateProcessingJob",
+                  "sagemaker:CreateTrainingJob",
+                  "sagemaker:CreateTransformJob",
+                  "sagemaker:UpdateNotebookInstance",
+                  "sagemaker:UpdateTrainingJob"
+              ],
+              "Resource": "*",
+              "Condition": {
+                  "ForAnyValue:StringNotLike": {
+                      "sagemaker:InstanceTypes": [
+                          "ml.t3.medium",
+                          "ml.t3.large",
+                          "ml.t3.xlarge",
+                          "ml.m5.large",
+                          "ml.m5.xlarge",
+                          "ml.c5.large",
+                          "ml.c5.xlarge"
+                      ]
+                  }
+              }
+          }]
+
+################################################
+Outputs:
+################################################
+
+  AWSAccountId:
+    Description: "Lab Account ID"
+    Value: !Ref "AWS::AccountId"
+
+  Region:
+    Description: "Default lab Region"
+    Value: !Ref "AWS::Region"
