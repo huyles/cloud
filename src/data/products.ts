@@ -132,13 +132,44 @@ export const fetchProducts = async (authToken?: string): Promise<Product[]> => {
     const response = await fetch(`${BROWSE_API}/products`, { headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     
-    const products = await response.json()
+    const data = await response.json()
     
-    // Add S3 URL prefix to images if using S3
-    return products.map((product: Product) => ({
-      ...product,
-      image: product.image.startsWith('http') ? product.image : `${S3_BUCKET}${product.image}`
-    }))
+    // Log raw API response for debugging
+    console.log('📦 Raw API response:', JSON.stringify(data, null, 2))
+    
+    // Lambda returns { products: [...] } so we need to extract the array
+    // Handle both formats: { products: [...] } or direct array [...]
+    const rawProducts = Array.isArray(data) ? data : (data.products || [])
+    
+    console.log('🌐 Fetched products from Lambda/DynamoDB:', rawProducts.length, 'items')
+    
+    // Normalize product data to match the Product interface
+    // DynamoDB might return different formats depending on how data was inserted
+    const products = rawProducts.map((product: any) => {
+      // Log each product for debugging
+      console.log('📝 Raw product:', product)
+      
+      return {
+        id: String(product.id || ''),
+        name: String(product.name || ''),
+        price: Number(product.price) || 0,
+        image: product.image?.startsWith('http') 
+          ? product.image 
+          : `${S3_BUCKET}${product.image || ''}`,
+        description: String(product.description || ''),
+        // Handle sizes - could be array of strings or array of objects
+        sizes: Array.isArray(product.sizes) 
+          ? product.sizes.map((s: any) => typeof s === 'string' ? s : String(s))
+          : [],
+        isFlashSale: Boolean(product.isFlashSale),
+        inventory: Number(product.inventory) || 0,
+        flashSale: product.flashSale || undefined
+      } as Product
+    })
+    
+    console.log('✅ Normalized products:', products)
+    
+    return products
   } catch (error) {
     console.log('🔧 Using mock data - AWS API not available:', error)
     return mockProducts
@@ -157,13 +188,33 @@ export const fetchProductById = async (id: string, authToken?: string): Promise<
     const response = await fetch(`${BROWSE_API}/products/${id}`, { headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     
-    const product = await response.json()
+    const rawProduct = await response.json()
     
-    // Add S3 URL prefix to image if using S3
-    return {
-      ...product,
-      image: product.image.startsWith('http') ? product.image : `${S3_BUCKET}${product.image}`
+    // Log raw response for debugging
+    console.log('📦 Raw product from API:', rawProduct)
+    
+    // Normalize product data to match the Product interface
+    const product: Product = {
+      id: String(rawProduct.id || ''),
+      name: String(rawProduct.name || ''),
+      price: Number(rawProduct.price) || 0,
+      image: rawProduct.image?.startsWith('http') 
+        ? rawProduct.image 
+        : `${S3_BUCKET}${rawProduct.image || ''}`,
+      description: String(rawProduct.description || ''),
+      // Handle sizes - could be array of strings or array of objects
+      sizes: Array.isArray(rawProduct.sizes) 
+        ? rawProduct.sizes.map((s: any) => typeof s === 'string' ? s : String(s))
+        : [],
+      isFlashSale: Boolean(rawProduct.isFlashSale),
+      inventory: Number(rawProduct.inventory) || 0,
+      flashSale: rawProduct.flashSale || undefined
     }
+    
+    console.log('🌐 Fetched product from Lambda/DynamoDB:', product.id, product.name)
+    console.log('✅ Normalized product:', product)
+    
+    return product
   } catch (error) {
     console.log('🔧 Using mock data - AWS API not available:', error)
     return mockProducts.find(product => product.id === id) || null
