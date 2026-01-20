@@ -1,25 +1,17 @@
 version: 0.2
 
-env:
-  variables:
-    S3_BUCKET: flashdrop-frontend-bucket
-    ECR_URI: 184143007829.dkr.ecr.us-east-1.amazonaws.com/cart-service
-
 phases:
   install:
     runtime-versions:
       nodejs: 18
-      docker: 20
     commands:
       - npm install
 
   build:
     commands:
-      # Frontend (Vite)
       - npm run build
-      - aws s3 sync dist s3://$S3_BUCKET --delete
 
-      # Backend (Go microservice)
-      - docker build -t cart-service:latest ./cart-service
-      - docker tag cart-service:latest $ECR_URI:latest
-      - docker push $ECR_URI:latest
+artifacts:
+  base-directory: dist
+  files:
+    - '**/*'
