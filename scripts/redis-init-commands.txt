@@ -1,0 +1,135 @@
+# ============================================================================
+# FlashDrop Redis Initialization Commands
+# Run these commands to initialize Redis with sample data
+# ============================================================================
+#
+# ARCHITECTURE NOTE:
+# Redis is the SINGLE SOURCE OF TRUTH for all ephemeral/real-time data:
+#   - Inventory counters (flashdrop:inventory:*)
+#   - Cart sessions (flashdrop:cart:*)
+#   - Active reservations (flashdrop:reservation:*)
+#   - Flash sale counters (flashdrop:flashsale:*)
+#   - Rate limiting (flashdrop:ratelimit:*)
+#
+# PostgreSQL stores ONLY persistent/completed data:
+#   - Completed orders, payment transactions, user accounts
+#   - Inventory audit log (changes AFTER checkout completes)
+#
+# ============================================================================
+
+# Connect to Redis:
+# redis-cli -h flashdrop-dev-redis.yhhwe0.0001.use1.cache.amazonaws.com -p 6379
+
+# ============================================================================
+# INVENTORY COUNTERS
+# These are the real-time stock levels for each product/size combination
+# Use DECR when reserving, INCR when reservation expires or item restocked
+# ============================================================================
+
+# Product 1: Air Jordan 1 Retro High ($170)
+SET flashdrop:inventory:1:7 10
+SET flashdrop:inventory:1:7.5 8
+SET flashdrop:inventory:1:8 12
+SET flashdrop:inventory:1:8.5 15
+SET flashdrop:inventory:1:9 25
+SET flashdrop:inventory:1:9.5 20
+SET flashdrop:inventory:1:10 18
+SET flashdrop:inventory:1:10.5 10
+SET flashdrop:inventory:1:11 5
+
+# Product 2: Nike Dunk Low ($100)
+SET flashdrop:inventory:2:7 15
+SET flashdrop:inventory:2:7.5 12
+SET flashdrop:inventory:2:8 20
+SET flashdrop:inventory:2:8.5 25
+SET flashdrop:inventory:2:9 50
+SET flashdrop:inventory:2:9.5 40
+SET flashdrop:inventory:2:10 35
+SET flashdrop:inventory:2:10.5 20
+SET flashdrop:inventory:2:11 10
+
+# Product 3: Adidas Yeezy Boost 350 ($220) - Limited stock (flash sale item)
+SET flashdrop:inventory:3:7 3
+SET flashdrop:inventory:3:7.5 2
+SET flashdrop:inventory:3:8 5
+SET flashdrop:inventory:3:8.5 4
+SET flashdrop:inventory:3:9 10
+SET flashdrop:inventory:3:9.5 8
+SET flashdrop:inventory:3:10 6
+SET flashdrop:inventory:3:10.5 3
+SET flashdrop:inventory:3:11 2
+
+# Product 4: New Balance 550 ($110)
+SET flashdrop:inventory:4:7 10
+SET flashdrop:inventory:4:7.5 8
+SET flashdrop:inventory:4:8 12
+SET flashdrop:inventory:4:8.5 15
+SET flashdrop:inventory:4:9 30
+SET flashdrop:inventory:4:9.5 25
+SET flashdrop:inventory:4:10 20
+SET flashdrop:inventory:4:10.5 12
+SET flashdrop:inventory:4:11 8
+
+# ============================================================================
+# FLASH SALE DATA
+# Real-time counters and configuration for active flash sales
+# ============================================================================
+
+# Flash sale sold counters (real-time tracking)
+SET flashdrop:flashsale:1:sold 75
+SET flashdrop:flashsale:3:sold 40
+
+# Flash sale configuration (cached from PostgreSQL flash_sales table)
+HSET flashdrop:flashsale:1 id "flash-1" product_id "1" original_price "170" sale_price "129" max_quantity "100" is_active "1"
+HSET flashdrop:flashsale:3 id "flash-3" product_id "3" original_price "220" sale_price "179" max_quantity "50" is_active "1"
+
+# ============================================================================
+# CART SESSIONS (Example - created dynamically by cart-service)
+# TTL: 1800 seconds (30 minutes)
+# ============================================================================
+# Example cart creation (DO NOT RUN - just for reference):
+# HSET flashdrop:cart:session123 id "cart-uuid" session_id "session123" items "[]" created_at "2026-01-19T12:00:00Z"
+# EXPIRE flashdrop:cart:session123 1800
+
+# ============================================================================
+# RESERVATIONS (Example - created dynamically during checkout)
+# TTL: 600 seconds (10 minutes)
+# These are the SINGLE SOURCE OF TRUTH for active inventory holds
+# PostgreSQL does NOT track active reservations
+# ============================================================================
+# Example reservation (DO NOT RUN - just for reference):
+# SET flashdrop:reservation:session123:1:9 1
+# EXPIRE flashdrop:reservation:session123:1:9 600
+#
+# When checkout completes:
+#   1. DEL flashdrop:reservation:session123:1:9
+#   2. PostgreSQL: INSERT INTO inventory_audit_log (change_type='sale', ...)
+#
+# When reservation expires (user abandons checkout):
+#   1. Redis TTL auto-deletes the key
+#   2. Background job: INCR flashdrop:inventory:1:9 (restore stock)
+
+# ============================================================================
+# RATE LIMITING (Example - created dynamically by API)
+# TTL: 60 seconds
+# ============================================================================
+# Example rate limit (DO NOT RUN - just for reference):
+# INCR flashdrop:ratelimit:192.168.1.1
+# EXPIRE flashdrop:ratelimit:192.168.1.1 60
+
+# ============================================================================
+# VERIFICATION COMMANDS
+# ============================================================================
+
+# Count all FlashDrop keys
+KEYS flashdrop:*
+
+# Check inventory for a specific product/size
+GET flashdrop:inventory:1:9
+
+# Check flash sale status
+HGETALL flashdrop:flashsale:1
+GET flashdrop:flashsale:1:sold
+
+# Check total inventory for Product 1 (all sizes)
+# MGET flashdrop:inventory:1:7 flashdrop:inventory:1:7.5 flashdrop:inventory:1:8 ...

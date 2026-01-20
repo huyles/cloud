@@ -147,6 +147,12 @@ To connect this frontend to AWS, you need to create these backend services:
 
 ### 1. DynamoDB Table (Product Catalog)
 
+Product Metadata: Stores product
+details, descriptions, images links, and
+user profiles. Its low-latency, high-
+scale read capacity is perfect for the
+browsing experience.
+
 ```bash
 aws dynamodb create-table \
   --table-name FlashDrop-Products \
@@ -157,36 +163,53 @@ aws dynamodb create-table \
 
 ### 2. Lambda Function (Product Browsing)
 
-Create a Lambda function that:
-
-- Scans DynamoDB for all products (`GET /products`)
-- Gets single product by ID (`GET /products/{id}`)
-- Returns JSON with CORS headers
+Product Browsing & Listing: Handles
+API calls for fetching product lists and
+details from DynamoDB. This scales
+instantly during traffic spikes.
 
 ### 3. API Gateway (HTTP Endpoints)
 
-Set up REST API with:
+Routes: Handles all requests
+(/products, /checkout, /inventory). It
+directs simple requests (browsing) to
+Lambda and complex, stateful
+requests (reserving inventory) to ECS.
 
-- `/products` - GET all products
-- `/products/{id}` - GET single product
-- CORS enabled for your domain
-- Connected to Lambda function
+### 4. ECS/ECR Service (Inventory Management)
 
-### 4. ECS Service (Inventory Management)
-
-Create containerized service for:
-
-- Real-time inventory tracking
-- Item reservation with locking
-- Integration with ElastiCache
+Inventory Reservation Service: Runs
+the critical logic that handles
+cart/checkout. This service requires
+sustained connections and strict
+control over concurrency (using locks)
+which is better suited for a container
+than a stateless Lambda function.
 
 ### 5. S3 Bucket (Product Images)
 
-Upload product images and configure:
+Frontend Hosting & Assets: Hosts the
+static single-page application
+(React/Vue) and stores all high-
+resolution product images and videos.
 
-- Public read access
-- CORS for your domain
-- Optional: CloudFront CDN
+### 6. ElastiCache (Redis)
+
+Inventory Counter & Leaderboard:
+Stores the remaining inventory count.
+Every time a user reserves an item, this
+counter is instantly decremented,
+providing real-time data to the
+storefront with microsecond latency.
+
+### 7. RDS (PostgreSQL/MySQL)
+
+Transactional Ledger: Stores the final,
+committed order data (financial
+records, payment status, shipping).
+RDS is chosen for its ACID compliance,
+ensuring data integrity for financial
+transactions.
 
 ## 🔧 Frontend API Integration
 

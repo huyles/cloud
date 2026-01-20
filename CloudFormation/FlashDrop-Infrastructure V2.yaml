@@ -1,0 +1,1169 @@
+---
+Outputs:
+  RDSEndpoint:
+    Value:
+      Fn::GetAtt: "RDSInstance.Endpoint.Address"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-RDSEndpoint"
+    Description: "RDS PostgreSQL Endpoint"
+  RDSPort:
+    Value:
+      Fn::GetAtt: "RDSInstance.Endpoint.Port"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-RDSPort"
+    Description: "RDS PostgreSQL Port"
+  ProductImagesBucketName:
+    Value:
+      Ref: "ProductImagesBucket"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ProductImagesBucketName"
+    Description: "S3 Product Images Bucket Name"
+  CartServiceALBUrl:
+    Value:
+      Fn::Sub: "http://${CartServiceALB.DNSName}"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-CartServiceURL"
+    Description: "Cart Service ALB URL"
+  ElastiCacheEndpoint:
+    Value:
+      Fn::GetAtt: "ElastiCacheCluster.RedisEndpoint.Address"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ElastiCacheEndpoint"
+    Description: "ElastiCache Redis Endpoint"
+  ApiGatewayURL:
+    Value:
+      Fn::Sub: "https://${FlashDropApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ApiGatewayURL"
+    Description: "API Gateway Invoke URL"
+  VpcId:
+    Value:
+      Ref: "FlashDropVPC"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-VpcId"
+    Description: "VPC ID"
+  PublicSubnet1Id:
+    Value:
+      Ref: "PublicSubnet1"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-PublicSubnet1Id"
+    Description: "Public Subnet 1 ID"
+  PublicSubnet2Id:
+    Value:
+      Ref: "PublicSubnet2"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-PublicSubnet2Id"
+    Description: "Public Subnet 2 ID"
+  ProductsTableArn:
+    Value:
+      Fn::GetAtt: "ProductsTable.Arn"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ProductsTableArn"
+    Description: "DynamoDB Products Table ARN"
+  FrontendBucketName:
+    Value:
+      Ref: "FrontendBucket"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-FrontendBucketName"
+    Description: "S3 Frontend Bucket Name"
+  ECSClusterName:
+    Value:
+      Ref: "ECSCluster"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ECSClusterName"
+    Description: "ECS Cluster Name"
+  ProductsTableName:
+    Value:
+      Ref: "ProductsTable"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ProductsTableName"
+    Description: "DynamoDB Products Table Name"
+  FrontendWebsiteURL:
+    Value:
+      Fn::GetAtt: "FrontendBucket.WebsiteURL"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-FrontendWebsiteURL"
+    Description: "S3 Frontend Website URL"
+  LoggingBucketName:
+    Value:
+      Ref: "LoggingBucket"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-LoggingBucketName"
+    Description: "S3 Logging Bucket Name"
+  ProductImagesBucketURL:
+    Value:
+      Fn::Sub: "https://${ProductImagesBucket}.s3.${AWS::Region}.amazonaws.com"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ProductImagesBucketURL"
+    Description: "S3 Product Images Bucket URL"
+  ECRRepositoryUri:
+    Value:
+      Fn::Sub: "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${CartServiceRepository}"
+    Export:
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-ECRRepositoryUri"
+    Description: "ECR Repository URI for Cart Service"
+Metadata:
+  AWSToolsMetrics:
+    IaC_Generator: "arn:aws:cloudformation:us-east-1:184143007829:generatedTemplate/00ef27e6-3f50-4c1c-9d53-1ca98a8e95f5"
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  "FlashDrop E-Commerce Infrastructure Stack\n==========================================\n\
+  This template creates the backend infrastructure for the FlashDrop limited edition\
+  \ sneaker store.\nIncludes DynamoDB, Lambda, API Gateway, ECS/ECR, S3, ElastiCache\
+  \ (Redis), and RDS (PostgreSQL).\nDesigned for AWS Academy Learner Lab - uses LabRole\
+  \ for all IAM requirements.\n\nDEPLOYMENT:\n-----------\nAll parameters have defaults\
+  \ - deploy with a single command (run from project root):\n  aws cloudformation\
+  \ create-stack --stack-name flashdrop --template-body file://CloudFormation/FlashDrop-Infrastructure.yaml\
+  \ --region us-east-1\n"
+Parameters:
+  PrivateSubnet1CIDR:
+    Default: "10.0.3.0/24"
+    Type: "String"
+    Description: "CIDR block for Private Subnet 1"
+  KeyName:
+    Default: "Bastion Key Pair"
+    Type: "String"
+    Description: "Name of an existing EC2 KeyPair to enable SSH access"
+  PublicSubnet2CIDR:
+    Default: "10.0.2.0/24"
+    Type: "String"
+    Description: "CIDR block for Public Subnet 2"
+  DBPassword:
+    NoEcho: true
+    Type: "String"
+    Description:
+      "Database master password (min 8 characters).\nIMPORTANT: Change\
+      \ this default value for production deployments!\n"
+    AllowedPattern: "[a-zA-Z0-9]*"
+    MinLength: 8
+    ConstraintDescription: "Must contain only alphanumeric characters"
+    MaxLength: 41
+    Default: "FlashDrop2024Secure"
+  VpcCIDR:
+    Default: "10.0.0.0/16"
+    Type: "String"
+    Description: "CIDR block for the VPC"
+  ProjectName:
+    Default: "flashdrop"
+    Type: "String"
+    Description: "Project name used for resource naming"
+  PrivateSubnet2CIDR:
+    Default: "10.0.4.0/24"
+    Type: "String"
+    Description: "CIDR block for Private Subnet 2"
+  Environment:
+    Type: "String"
+    AllowedValues:
+      - "dev"
+      - "staging"
+      - "prod"
+    Description: "Environment name for resource naming and configuration"
+    Default: "dev"
+  PublicSubnet1CIDR:
+    Default: "10.0.1.0/24"
+    Type: "String"
+    Description: "CIDR block for Public Subnet 1"
+  DBUsername:
+    NoEcho: true
+    Type: "String"
+    Description: "Database master username"
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    MinLength: 1
+    ConstraintDescription:
+      "Must begin with a letter and contain only alphanumeric\
+      \ characters"
+    MaxLength: 16
+    Default: "flashdropadmin"
+Resources:
+  PublicRouteTable:
+    Properties:
+      VpcId:
+        Ref: "FlashDropVPC"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-public-rt"
+          Key: "Name"
+    Type: "AWS::EC2::RouteTable"
+  RDSSubnetGroup:
+    Properties:
+      DBSubnetGroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-rds-subnet-group"
+      DBSubnetGroupDescription: "Subnet group for RDS PostgreSQL"
+      SubnetIds:
+        - Ref: "PrivateSubnet1"
+        - Ref: "PrivateSubnet2"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-rds-subnet-group"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::RDS::DBSubnetGroup"
+  RDSSecurityGroup:
+    Properties:
+      GroupDescription: "Security group for RDS PostgreSQL"
+      GroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-rds-sg"
+      VpcId:
+        Ref: "FlashDropVPC"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 5432
+          Description: "Allow PostgreSQL traffic from ECS"
+          SourceSecurityGroupId:
+            Ref: "ECSSecurityGroup"
+          ToPort: 5432
+        - IpProtocol: "tcp"
+          FromPort: 5432
+          Description: "To allow viewing and debugging database content remotely"
+          SourceSecurityGroupId:
+            Ref: "EC2SecurityGroup"
+          ToPort: 5432
+        - IpProtocol: "tcp"
+          FromPort: 5432
+          Description: "Allow PostgreSQL traffic from Lambda"
+          SourceSecurityGroupId:
+            Ref: "LambdaSecurityGroup"
+          ToPort: 5432
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-rds-sg"
+          Key: "Name"
+    Type: "AWS::EC2::SecurityGroup"
+  DefaultPublicRoute:
+    Properties:
+      GatewayId:
+        Ref: "InternetGateway"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+    Type: "AWS::EC2::Route"
+    DependsOn: "InternetGatewayAttachment"
+  ProductBrowsingLogGroup:
+    Properties:
+      RetentionInDays: 14
+      LogGroupName:
+        Fn::Sub: "/aws/lambda/${ProductBrowsingFunction}"
+    Type: "AWS::Logs::LogGroup"
+  ProductBrowsingFunctionPermission:
+    Properties:
+      FunctionName:
+        Ref: "ProductBrowsingFunction"
+      Action: "lambda:InvokeFunction"
+      SourceArn:
+        Fn::Sub: "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${FlashDropApi}/*"
+      Principal: "apigateway.amazonaws.com"
+    Type: "AWS::Lambda::Permission"
+  PrivateSubnet1RouteTableAssociation:
+    Properties:
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+      SubnetId:
+        Ref: "PrivateSubnet1"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+  PrivateSubnet1:
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock:
+        Ref: "PrivateSubnet1CIDR"
+      VpcId:
+        Ref: "FlashDropVPC"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-private-1"
+          Key: "Name"
+    Type: "AWS::EC2::Subnet"
+  FlashDropVPC:
+    Properties:
+      CidrBlock:
+        Ref: "VpcCIDR"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-vpc"
+          Key: "Name"
+    Type: "AWS::EC2::VPC"
+  PrivateSubnet2:
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock:
+        Ref: "PrivateSubnet2CIDR"
+      VpcId:
+        Ref: "FlashDropVPC"
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-private-2"
+          Key: "Name"
+    Type: "AWS::EC2::Subnet"
+  ElastiCacheSecurityGroup:
+    Properties:
+      GroupDescription: "Security group for ElastiCache Redis"
+      GroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-elasticache-sg"
+      VpcId:
+        Ref: "FlashDropVPC"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: 6379
+          Description: "Allow Redis traffic from ECS"
+          SourceSecurityGroupId:
+            Ref: "ECSSecurityGroup"
+          ToPort: 6379
+        - IpProtocol: "tcp"
+          FromPort: 6379
+          Description: "Allow Redis traffic from Lambda"
+          SourceSecurityGroupId:
+            Ref: "LambdaSecurityGroup"
+          ToPort: 6379
+        - IpProtocol: "tcp"
+          FromPort: 6379
+          Description: "Connection from Bastion Host"
+          SourceSecurityGroupId:
+            Ref: "EC2SecurityGroup"
+          ToPort: 6379
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-elasticache-sg"
+          Key: "Name"
+    Type: "AWS::EC2::SecurityGroup"
+  InternetGateway:
+    Properties:
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-igw"
+          Key: "Name"
+    Type: "AWS::EC2::InternetGateway"
+  PublicSubnet2:
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock:
+        Ref: "PublicSubnet2CIDR"
+      VpcId:
+        Ref: "FlashDropVPC"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-public-2"
+          Key: "Name"
+    Type: "AWS::EC2::Subnet"
+  PublicSubnet1:
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock:
+        Ref: "PublicSubnet1CIDR"
+      VpcId:
+        Ref: "FlashDropVPC"
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-public-1"
+          Key: "Name"
+    Type: "AWS::EC2::Subnet"
+  GetProductsRoute:
+    Properties:
+      ApiId:
+        Ref: "FlashDropApi"
+      RouteKey: "GET /products"
+      Target:
+        Fn::Sub: "integrations/${ProductsIntegration}"
+    Type: "AWS::ApiGatewayV2::Route"
+  FlashDropApi:
+    Properties:
+      Description: "FlashDrop API Gateway for product browsing and inventory"
+      CorsConfiguration:
+        MaxAge: 3600
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "OPTIONS"
+        AllowHeaders:
+          - "content-type"
+          - "authorization"
+          - "x-amz-date"
+          - "x-api-key"
+      ProtocolType: "HTTP"
+      Tags:
+        Environment:
+          Ref: "Environment"
+        Name:
+          Fn::Sub: "${ProjectName}-${Environment}-api"
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-api"
+    Type: "AWS::ApiGatewayV2::Api"
+  EC2Instance:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: "Retain"
+    Properties:
+      Tenancy: "default"
+      PrivateIpAddress: "10.0.1.137"
+      InstanceInitiatedShutdownBehavior: "stop"
+      BlockDeviceMappings:
+        - Ebs:
+            SnapshotId: "snap-032ad45778d0fbfa1"
+            VolumeType: "gp3"
+            Iops: 3000
+            VolumeSize: 8
+            Encrypted: false
+            DeleteOnTermination: true
+          DeviceName: "/dev/xvda"
+      PrivateDnsNameOptions:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      SecurityGroupIds:
+        - "sg-014f7cf971a3b0037"
+      EbsOptimized: true
+      DisableApiTermination: false
+      SourceDestCheck: true
+      PlacementGroupName: ""
+      VpcId: "vpc-0a69e384fa369d517"
+      State:
+        Code: "16"
+        Name: "running"
+      NetworkInterfaces:
+        - Ipv6Addresses: []
+          SecondaryPrivateIpAddressCount: 0
+          NetworkInterfaceId:
+            Ref: "EC2NetworkInterface"
+          DeviceIndex: "0"
+      ImageId: "ami-02dc6e3e481e2bbc5"
+      InstanceType: "t3.micro"
+      Monitoring: false
+      Tags:
+        - Value: "bastion host"
+          Key: "Name"
+      CreditSpecification:
+        CPUCredits: "unlimited"
+  CartServiceTaskDefinition:
+    Properties:
+      ExecutionRoleArn:
+        Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      TaskRoleArn:
+        Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Memory: "512"
+      ContainerDefinitions:
+        - Environment:
+            - Value:
+                Ref: "Environment"
+              Name: "ENVIRONMENT"
+            # REDIS_URL in host:port format for Go go-redis client
+            - Value:
+                Fn::Sub: "${ElastiCacheCluster.RedisEndpoint.Address}:6379"
+              Name: "REDIS_URL"
+            # POSTGRES_URL as full connection string for lib/pq driver
+            - Value:
+                Fn::Sub: "postgres://${DBUsername}:${DBPassword}@${RDSInstance.Endpoint.Address}:5432/flashdrop?sslmode=require"
+              Name: "POSTGRES_URL"
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: "tcp"
+          Image:
+            Fn::Sub: "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${CartServiceRepository}:latest"
+          Essential: true
+          LogConfiguration:
+            Options:
+              awslogs-group:
+                Ref: "CartServiceLogGroup"
+              awslogs-region:
+                Ref: "AWS::Region"
+              awslogs-stream-prefix: "cart-service"
+            LogDriver: "awslogs"
+          Name: "cart-service"
+      Family:
+        Fn::Sub: "${ProjectName}-${Environment}-cart-service"
+      RequiresCompatibilities:
+        - "FARGATE"
+      Cpu: "256"
+      NetworkMode: "awsvpc"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cart-service-task"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::ECS::TaskDefinition"
+  InternetGatewayAttachment:
+    Properties:
+      InternetGatewayId:
+        Ref: "InternetGateway"
+      VpcId:
+        Ref: "FlashDropVPC"
+    Type: "AWS::EC2::VPCGatewayAttachment"
+  ECSCluster:
+    Properties:
+      CapacityProviders:
+        - "FARGATE"
+        - "FARGATE_SPOT"
+      ClusterName:
+        Fn::Sub: "${ProjectName}-${Environment}-cluster"
+      DefaultCapacityProviderStrategy:
+        - Weight: 1
+          CapacityProvider: "FARGATE"
+      ClusterSettings:
+        - Value: "enabled"
+          Name: "containerInsights"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cluster"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::ECS::Cluster"
+  CartServiceLogGroup:
+    Properties:
+      RetentionInDays: 14
+      LogGroupName:
+        Fn::Sub: "/ecs/${ProjectName}-${Environment}-cart-service"
+    Type: "AWS::Logs::LogGroup"
+  PublicSubnet1RouteTableAssociation:
+    Properties:
+      RouteTableId:
+        Ref: "PublicRouteTable"
+      SubnetId:
+        Ref: "PublicSubnet1"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+  ProductsTable:
+    Properties:
+      TableName:
+        Fn::Sub: "${ProjectName}-${Environment}-products"
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "S"
+        - AttributeName: "category"
+          AttributeType: "S"
+      BillingMode: "PAY_PER_REQUEST"
+      GlobalSecondaryIndexes:
+        - IndexName: "category-index"
+          Projection:
+            ProjectionType: "ALL"
+          KeySchema:
+            - KeyType: "HASH"
+              AttributeName: "category"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      KeySchema:
+        - KeyType: "HASH"
+          AttributeName: "id"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-products"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::DynamoDB::Table"
+  EC2NetworkInterface:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::NetworkInterface"
+    DeletionPolicy: "Retain"
+    Properties:
+      SourceDestCheck: true
+      InterfaceType: "interface"
+      Description: ""
+      PrivateIpAddress: "10.0.1.137"
+      SecondaryPrivateIpAddressCount: 0
+      Ipv6PrefixCount: 0
+      Ipv4Prefixes: []
+      Ipv4PrefixCount: 0
+      GroupSet:
+        - "sg-014f7cf971a3b0037"
+      Ipv6Prefixes: []
+      SubnetId: "subnet-0c1880687cf96d65e"
+      Tags: []
+  LoggingBucket:
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - "W3045"
+    Properties:
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+        BlockPublicPolicy: true
+        BlockPublicAcls: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: "Enabled"
+            Id: "DeleteOldLogs"
+            ExpirationInDays: 90
+      BucketName:
+        Fn::Sub: "${ProjectName}-${Environment}-logs-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-logs"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::S3::Bucket"
+  ProductBrowsingFunction:
+    Properties:
+      Role:
+        Fn::Sub: "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      FunctionName:
+        Fn::Sub: "${ProjectName}-${Environment}-product-browsing"
+      MemorySize: 256
+      Runtime: "python3.12"
+      Description: "Lambda function for product browsing and listing from DynamoDB"
+      Timeout: 30
+      Handler: "index.lambda_handler"
+      Environment:
+        Variables:
+          PRODUCTS_TABLE:
+            Ref: "ProductsTable"
+          ENVIRONMENT:
+            Ref: "Environment"
+      Code:
+        ZipFile:
+          "import json\nimport boto3\nimport os\nfrom decimal import Decimal\n\
+          \ndynamodb = boto3.resource('dynamodb')\ntable = dynamodb.Table(os.environ['PRODUCTS_TABLE'])\n\
+          \nclass DecimalEncoder(json.JSONEncoder):\n    def default(self, obj):\n\
+          \        if isinstance(obj, Decimal):\n            return float(obj)\n \
+          \       return super(DecimalEncoder, self).default(obj)\n\ndef lambda_handler(event,\
+          \ context):\n    http_method = event.get('httpMethod', event.get('requestContext',\
+          \ {}).get('http', {}).get('method', 'GET'))\n    path = event.get('path',\
+          \ event.get('rawPath', '/'))\n    \n    # CORS headers\n    headers = {\n\
+          \        'Content-Type': 'application/json',\n        'Access-Control-Allow-Origin':\
+          \ '*',\n        'Access-Control-Allow-Headers': 'Content-Type,Authorization',\n\
+          \        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'\n    }\n   \
+          \ \n    if http_method == 'OPTIONS':\n        return {'statusCode': 200,\
+          \ 'headers': headers, 'body': ''}\n    \n    try:\n        if '/products/'\
+          \ in path:\n            # Get single product\n            product_id = path.split('/products/')[-1].strip('/')\n\
+          \            response = table.get_item(Key={'id': product_id})\n       \
+          \     item = response.get('Item')\n            if item:\n              \
+          \  return {\n                    'statusCode': 200,\n                  \
+          \  'headers': headers,\n                    'body': json.dumps(item, cls=DecimalEncoder)\n\
+          \                }\n            return {\n                'statusCode':\
+          \ 404,\n                'headers': headers,\n                'body': json.dumps({'error':\
+          \ 'Product not found'})\n            }\n        else:\n            # Get\
+          \ all products\n            response = table.scan()\n            items =\
+          \ response.get('Items', [])\n            return {\n                'statusCode':\
+          \ 200,\n                'headers': headers,\n                'body': json.dumps({'products':\
+          \ items}, cls=DecimalEncoder)\n            }\n    except Exception as e:\n\
+          \        return {\n            'statusCode': 500,\n            'headers':\
+          \ headers,\n            'body': json.dumps({'error': str(e)})\n        }\n"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-product-browsing"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::Lambda::Function"
+  FrontendBucket:
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - "W3045"
+      Comment: "Public access is intentionally enabled for static website hosting"
+    Properties:
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+        BlockPublicPolicy: false
+        BlockPublicAcls: false
+      BucketName:
+        Fn::Sub: "${ProjectName}-${Environment}-frontend-${AWS::AccountId}"
+      CorsConfiguration:
+        CorsRules:
+          - MaxAge: 3600
+            AllowedMethods:
+              - "GET"
+              - "HEAD"
+            AllowedOrigins:
+              - "*"
+            AllowedHeaders:
+              - "*"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      WebsiteConfiguration:
+        IndexDocument: "index.html"
+        ErrorDocument: "error.html"
+      VersioningConfiguration:
+        Status: "Enabled"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-frontend"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::S3::Bucket"
+  ALBSecurityGroup:
+    Properties:
+      GroupDescription: "Security group for Application Load Balancer"
+      GroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-alb-sg"
+      VpcId:
+        Ref: "FlashDropVPC"
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "tcp"
+          FromPort: 80
+          Description: "Allow HTTP traffic"
+          ToPort: 80
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "tcp"
+          FromPort: 443
+          Description: "Allow HTTPS traffic"
+          ToPort: 443
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: -1
+          Description: "Allow all outbound traffic"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-alb-sg"
+          Key: "Name"
+    Type: "AWS::EC2::SecurityGroup"
+  EC2SecurityGroup:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "To connect with bastion host"
+      GroupName: "Bastion Host SG"
+      VpcId: "vpc-0a69e384fa369d517"
+      SecurityGroupIngress:
+        - CidrIp: "203.205.26.20/32"
+          IpProtocol: "tcp"
+          FromPort: 22
+          ToPort: 22
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+          FromPort: -1
+          ToPort: -1
+  NatGateway:
+    Properties:
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-nat"
+          Key: "Name"
+      AllocationId:
+        Fn::GetAtt: "NatGatewayEIP.AllocationId"
+      SubnetId:
+        Ref: "PublicSubnet1"
+    Type: "AWS::EC2::NatGateway"
+  ECSSecurityGroup:
+    Properties:
+      GroupDescription: "Security group for ECS tasks"
+      GroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-ecs-sg"
+      VpcId:
+        Ref: "FlashDropVPC"
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "tcp"
+          FromPort: 8080
+          Description: "Allow inbound traffic on port 8080"
+          ToPort: 8080
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: -1
+          Description: "Allow all outbound traffic"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-ecs-sg"
+          Key: "Name"
+    Type: "AWS::EC2::SecurityGroup"
+  GetProductByIdRoute:
+    Properties:
+      ApiId:
+        Ref: "FlashDropApi"
+      RouteKey: "GET /products/{id}"
+      Target:
+        Fn::Sub: "integrations/${ProductsIntegration}"
+    Type: "AWS::ApiGatewayV2::Route"
+  ElastiCacheCluster:
+    Properties:
+      CacheNodeType: "cache.t3.micro"
+      EngineVersion: "7.0"
+      CacheSubnetGroupName:
+        Ref: "ElastiCacheSubnetGroup"
+      VpcSecurityGroupIds:
+        - Ref: "ElastiCacheSecurityGroup"
+      Port: 6379
+      ClusterName:
+        Fn::Sub: "${ProjectName}-${Environment}-redis"
+      NumCacheNodes: 1
+      Engine: "redis"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-redis"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::ElastiCache::CacheCluster"
+  ProductsIntegration:
+    Properties:
+      Description: "Lambda integration for products"
+      IntegrationUri:
+        Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ProductBrowsingFunction.Arn}/invocations"
+      PayloadFormatVersion: "2.0"
+      ApiId:
+        Ref: "FlashDropApi"
+      IntegrationMethod: "POST"
+      IntegrationType: "AWS_PROXY"
+    Type: "AWS::ApiGatewayV2::Integration"
+  CartServiceRepository:
+    Properties:
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      RepositoryName:
+        Fn::Sub: "${ProjectName}-${Environment}-cart-service"
+      ImageTagMutability: "MUTABLE"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cart-service"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+      LifecyclePolicy:
+        LifecyclePolicyText:
+          "{\n  \"rules\": [\n    {\n      \"rulePriority\": 1,\n\
+          \      \"description\": \"Keep only 10 untagged images\",\n      \"selection\"\
+          : {\n        \"tagStatus\": \"untagged\",\n        \"countType\": \"imageCountMoreThan\"\
+          ,\n        \"countNumber\": 10\n      },\n      \"action\": {\n        \"\
+          type\": \"expire\"\n      }\n    }\n  ]\n}\n"
+    Type: "AWS::ECR::Repository"
+  ProductImagesBucket:
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - "W3045"
+      Comment:
+        "Public access is intentionally enabled for serving product images\
+        \ to frontend"
+    Properties:
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+        BlockPublicPolicy: false
+        BlockPublicAcls: false
+      BucketName:
+        Fn::Sub: "${ProjectName}-${Environment}-images-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: "Enabled"
+      CorsConfiguration:
+        CorsRules:
+          - MaxAge: 3600
+            AllowedMethods:
+              - "GET"
+              - "HEAD"
+            AllowedOrigins:
+              - "*"
+            AllowedHeaders:
+              - "*"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-images"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::S3::Bucket"
+  FrontendBucketPolicy:
+    Properties:
+      Bucket:
+        Ref: "FrontendBucket"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource:
+              Fn::Sub: "${FrontendBucket.Arn}/*"
+            Effect: "Allow"
+            Action: "s3:GetObject"
+            Principal: "*"
+            Sid: "PublicReadGetObject"
+    Type: "AWS::S3::BucketPolicy"
+  PrivateSubnet2RouteTableAssociation:
+    Properties:
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+      SubnetId:
+        Ref: "PrivateSubnet2"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+  LambdaSecurityGroup:
+    Properties:
+      GroupDescription: "Security group for Lambda functions"
+      GroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-lambda-sg"
+      VpcId:
+        Ref: "FlashDropVPC"
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: -1
+          Description: "Allow all outbound traffic"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-lambda-sg"
+          Key: "Name"
+    Type: "AWS::EC2::SecurityGroup"
+  ProductImagesBucketPolicy:
+    Properties:
+      Bucket:
+        Ref: "ProductImagesBucket"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Resource:
+              Fn::Sub: "${ProductImagesBucket.Arn}/*"
+            Effect: "Allow"
+            Action: "s3:GetObject"
+            Principal: "*"
+            Sid: "PublicReadGetObject"
+    Type: "AWS::S3::BucketPolicy"
+  ElastiCacheSubnetGroup:
+    Properties:
+      SubnetIds:
+        - Ref: "PrivateSubnet1"
+        - Ref: "PrivateSubnet2"
+      CacheSubnetGroupName:
+        Fn::Sub: "${ProjectName}-${Environment}-redis-subnet-group"
+      Description: "Subnet group for ElastiCache Redis"
+    Type: "AWS::ElastiCache::SubnetGroup"
+  EC2Volume:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Volume"
+    DeletionPolicy: "Retain"
+    Properties:
+      MultiAttachEnabled: false
+      SnapshotId: "snap-032ad45778d0fbfa1"
+      VolumeType: "gp3"
+      Encrypted: false
+      Size: 8
+      AutoEnableIO: true
+      AvailabilityZoneId: "use1-az6"
+      AvailabilityZone: "us-east-1a"
+      Throughput: 125
+      Iops: 3000
+      Tags: []
+  CartServiceTargetGroup:
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      VpcId:
+        Ref: "FlashDropVPC"
+      HealthyThresholdCount: 2
+      Port: 8080
+      HealthCheckPath: "/health"
+      TargetType: "ip"
+      Protocol: "HTTP"
+      UnhealthyThresholdCount: 5
+      HealthCheckTimeoutSeconds: 5
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cart-tg"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-cart-tg"
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+  CartServiceListener:
+    Properties:
+      Protocol: "HTTP"
+      LoadBalancerArn:
+        Ref: "CartServiceALB"
+      Port: 80
+      DefaultActions:
+        - TargetGroupArn:
+            Ref: "CartServiceTargetGroup"
+          Type: "forward"
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+  NatGatewayEIP:
+    Properties:
+      Domain: "vpc"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-nat-eip"
+          Key: "Name"
+    Type: "AWS::EC2::EIP"
+    DependsOn: "InternetGatewayAttachment"
+  DefaultPrivateRoute:
+    Properties:
+      NatGatewayId:
+        Ref: "NatGateway"
+      RouteTableId:
+        Ref: "PrivateRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+    Type: "AWS::EC2::Route"
+  PrivateRouteTable:
+    Properties:
+      VpcId:
+        Ref: "FlashDropVPC"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-private-rt"
+          Key: "Name"
+    Type: "AWS::EC2::RouteTable"
+  RDSInstance:
+    Metadata:
+      Comment:
+        "Using db.t4g.medium for cost-effective Graviton instance.\nPostgreSQL\
+        \ 16.3 is a stable, supported version.\nAWS Academy Learner Lab restricts\
+        \ to db.*.nano/micro/small/medium classes.\n"
+    Properties:
+      StorageEncrypted: true
+      EngineVersion: "17.2"
+      StorageType: "gp3"
+      DBInstanceClass: "db.t4g.medium"
+      DeleteAutomatedBackups: true
+      EnablePerformanceInsights: false
+      DBSubnetGroupName:
+        Ref: "RDSSubnetGroup"
+      DeletionProtection: false
+      DBInstanceIdentifier:
+        Fn::Sub: "${ProjectName}-${Environment}-postgres"
+      AllocatedStorage: 20
+      MasterUserPassword:
+        Ref: "DBPassword"
+      VPCSecurityGroups:
+        - Ref: "RDSSecurityGroup"
+      MasterUsername:
+        Ref: "DBUsername"
+      DBName: "flashdrop"
+      PubliclyAccessible: true
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      Engine: "postgres"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-postgres"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::RDS::DBInstance"
+  CartServiceALB:
+    Properties:
+      SecurityGroups:
+        - Ref: "ALBSecurityGroup"
+      Type: "application"
+      Subnets:
+        - Ref: "PublicSubnet1"
+        - Ref: "PublicSubnet2"
+      Scheme: "internet-facing"
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cart-alb"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+      Name:
+        Fn::Sub: "${ProjectName}-${Environment}-cart-alb"
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+  PublicSubnet2RouteTableAssociation:
+    Properties:
+      RouteTableId:
+        Ref: "PublicRouteTable"
+      SubnetId:
+        Ref: "PublicSubnet2"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+  CartService:
+    Properties:
+      TaskDefinition:
+        Ref: "CartServiceTaskDefinition"
+      ServiceName:
+        Fn::Sub: "${ProjectName}-${Environment}-cart-service"
+      Cluster:
+        Ref: "ECSCluster"
+      LoadBalancers:
+        - ContainerPort: 8080
+          TargetGroupArn:
+            Ref: "CartServiceTargetGroup"
+          ContainerName: "cart-service"
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - Ref: "ECSSecurityGroup"
+          Subnets:
+            - Ref: "PublicSubnet1"
+            - Ref: "PublicSubnet2"
+          AssignPublicIp: "ENABLED"
+      DesiredCount: 1
+      LaunchType: "FARGATE"
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      Tags:
+        - Value:
+            Fn::Sub: "${ProjectName}-${Environment}-cart-service"
+          Key: "Name"
+        - Value:
+            Ref: "Environment"
+          Key: "Environment"
+    Type: "AWS::ECS::Service"
+    DependsOn: "CartServiceListener"
+  ApiStage:
+    Properties:
+      AutoDeploy: true
+      Description:
+        Fn::Sub: "${Environment} stage for FlashDrop API"
+      ApiId:
+        Ref: "FlashDropApi"
+      StageName:
+        Ref: "Environment"
+      Tags:
+        Environment:
+          Ref: "Environment"
+        Name:
+          Fn::Sub: "${ProjectName}-${Environment}-stage"
+    Type: "AWS::ApiGatewayV2::Stage"
