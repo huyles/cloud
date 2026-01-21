@@ -1,8 +1,8 @@
-name: Full CI/CD (Frontend + Backend)
+name: Full CI/CD (Frontend + Backend + ECS)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build-and-deploy:
@@ -16,7 +16,7 @@ jobs:
       uses: actions/checkout@v4
 
     # =========================
-    # Frontend: Vite build
+    # FRONTEND (Vite → S3)
     # =========================
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -30,7 +30,7 @@ jobs:
       run: npm run build
 
     # =========================
-    # AWS credentials (Learner Lab)
+    # AWS Credentials (Learner Lab)
     # =========================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -40,17 +40,13 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    # =========================
-    # Deploy frontend to S3
-    # =========================
     - name: Deploy frontend to S3
       run: |
         aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
 
-    # ==================================================
-    # BACKEND: Go → Docker → ECR
-    # ==================================================
-
+    # =========================
+    # BACKEND (Go → Docker → ECR)
+    # =========================
     - name: Login to Amazon ECR
       run: |
         aws ecr get-login-password --region us-east-1 \
@@ -67,3 +63,13 @@ jobs:
       run: |
         docker push \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
+
+    # =========================
+    # FORCE REDEPLOY ECS FARGATE
+    # =========================
+    - name: Force ECS Fargate redeploy
+      run: |
+        aws ecs update-service \
+          --cluster flashdrop-cluster \
+          --service cart-service \
+          --force-new-deployment
