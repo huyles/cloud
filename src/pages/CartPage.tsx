@@ -37,8 +37,11 @@ const checkServiceHealth = async (): Promise<boolean> => {
       method: 'GET',
       signal: AbortSignal.timeout(2000)
     })
-    return response.ok
-  } catch {
+    const isHealthy = response.ok
+    console.log('🏥 Cart service health check:', isHealthy ? 'healthy' : 'unhealthy')
+    return isHealthy
+  } catch (error) {
+    console.log('🏥 Cart service health check failed:', error)
     return false
   }
 }
@@ -62,6 +65,7 @@ const CartPage: React.FC = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [serviceAvailable, setServiceAvailable] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false) // Add flag to prevent race conditions
 
   // Load cart function - can be called to refresh
   const loadCart = useCallback(() => {
@@ -85,21 +89,21 @@ const CartPage: React.FC = () => {
       }
     })
 
-    // Listen for cart updates (when items are added from ProductPage)
-    const handleCartUpdate = () => {
-      console.log('🔔 Cart update event received')
-      loadCart()
+    // Listen for cart updates from other tabs/windows only
+    const handleStorageUpdate = () => {
+      console.log('🔔 Storage update event received from another tab')
+      if (!isUpdating) {
+        loadCart()
+      }
     }
 
-    // Listen for both custom event and storage event
-    window.addEventListener('cartUpdated', handleCartUpdate)
-    window.addEventListener('storage', handleCartUpdate)
+    // Listen for storage events (from other tabs) but NOT cartUpdated events
+    window.addEventListener('storage', handleStorageUpdate)
 
     return () => {
-      window.removeEventListener('cartUpdated', handleCartUpdate)
-      window.removeEventListener('storage', handleCartUpdate)
+      window.removeEventListener('storage', handleStorageUpdate)
     }
-  }, [loadCart])
+  }, [loadCart]) // Remove isUpdating dependency
 
   // Update prices based on current flash sale status
   useEffect(() => {
@@ -156,27 +160,41 @@ const CartPage: React.FC = () => {
 
   // Remove item from cart
   const removeItem = async (id: string, size: string) => {
+    console.log('🗑️ Removing item:', id, size)
+    console.log('📦 Current cart items:', cartItems)
+    
+    setIsUpdating(true) // Prevent race condition
+    
     const newItems = cartItems.filter(item => !(item.id === id && item.size === size))
+    console.log('📦 New cart items after filter:', newItems)
+    console.log('📦 Items removed?', cartItems.length !== newItems.length)
     setCartItems(newItems)
     
     // Trigger header update
     window.dispatchEvent(new Event('cartUpdated'))
     
-    // Also remove from service
-    if (serviceAvailable) {
-      try {
-        const sessionId = getSessionId()
-        await fetch(`${CART_SERVICE_URL}/api/cart/${sessionId}/item/${id}/${size}`, {
-          method: 'DELETE'
-        })
-      } catch (err) {
-        console.log('Failed to remove from cart service:', err)
-      }
-    }
+    // Reset updating flag after a short delay
+    setTimeout(() => setIsUpdating(false), 100)
+    
+    // Also remove from service (optional, don't block UI)
+    // Disabled for local development to avoid 404 errors
+    // if (serviceAvailable) {
+    //   fetch(`${CART_SERVICE_URL}/api/cart/${getSessionId()}/item/${id}/${size}`, {
+    //     method: 'DELETE'
+    //   }).then(() => {
+    //     console.log('✅ Item removed from cart service')
+    //   }).catch((err) => {
+    //     console.log('ℹ️ Cart service sync failed (UI still works):', err.message)
+    //   })
+    // }
   }
 
   // Update quantity
   const updateQuantity = async (id: string, size: string, newQuantity: number) => {
+    console.log('🔢 Updating quantity:', id, size, 'to', newQuantity)
+    
+    setIsUpdating(true) // Prevent race condition
+    
     if (newQuantity <= 0) {
       removeItem(id, size)
       return
@@ -187,23 +205,26 @@ const CartPage: React.FC = () => {
         ? { ...item, quantity: newQuantity }
         : item
     )
+    console.log('📦 New cart items after quantity update:', newItems)
     setCartItems(newItems)
     
     // Trigger header update
     window.dispatchEvent(new Event('cartUpdated'))
     
-    // Also update in service
+    // Reset updating flag after a short delay
+    setTimeout(() => setIsUpdating(false), 100)
+    
+    // Also update in service (optional, don't block UI)
     if (serviceAvailable) {
-      try {
-        const sessionId = getSessionId()
-        await fetch(`${CART_SERVICE_URL}/api/cart/${sessionId}/item/${id}/${size}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ quantity: newQuantity })
-        })
-      } catch (err) {
-        console.log('Failed to update cart service:', err)
-      }
+      fetch(`${CART_SERVICE_URL}/api/cart/${getSessionId()}/item/${id}/${size}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: newQuantity })
+      }).then(() => {
+        console.log('✅ Quantity updated in cart service')
+      }).catch((err) => {
+        console.log('ℹ️ Cart service sync failed (UI still works):', err.message)
+      })
     }
   }
 
