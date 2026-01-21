@@ -10,13 +10,13 @@ jobs:
 
     steps:
     # =========================
-    # Checkout
+    # 1. CHECKOUT SOURCE
     # =========================
     - name: Checkout repository
       uses: actions/checkout@v4
 
     # =========================
-    # FRONTEND (Vite → S3)
+    # 2. FRONTEND (VITE BUILD – CI ONLY)
     # =========================
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -29,8 +29,12 @@ jobs:
     - name: Build frontend
       run: npm run build
 
+    # NOTE:
+    # Frontend deployment to S3 is NOT done here
+    # because AWS Learner Lab enforces explicit deny on s3:PutObject
+
     # =========================
-    # AWS Credentials (Learner Lab)
+    # 3. AWS CREDENTIALS
     # =========================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -40,12 +44,8 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    - name: Deploy frontend to S3
-      run: |
-        aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
-
     # =========================
-    # BACKEND (Docker → ECR)
+    # 4. BACKEND (DOCKER → ECR)
     # =========================
     - name: Login to Amazon ECR
       run: |
@@ -55,8 +55,8 @@ jobs:
 
     - name: Build and tag Docker image
       run: |
-        docker build -t cart-service:latest ./cart-service
-        docker tag cart-service:latest \
+        docker build -t flashdrop-dev-cart-service:latest ./cart-service
+        docker tag flashdrop-dev-cart-service:latest \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
     - name: Push Docker image to ECR
@@ -65,11 +65,11 @@ jobs:
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
     # =========================
-    # FORCE ECS FARGATE REDEPLOY
+    # 5. FORCE ECS FARGATE REDEPLOY (FIXED)
     # =========================
     - name: Force ECS redeploy
       run: |
         aws ecs update-service \
           --cluster flashdrop-dev-cluster \
-          --service <SERVICE_NAME> \
+          --service flashdrop-dev-cart-service \
           --force-new-deployment
