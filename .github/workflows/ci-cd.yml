@@ -1,0 +1,69 @@
+name: Full CI/CD (Frontend + Backend)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # =========================
+    # Checkout source
+    # =========================
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    # =========================
+    # Frontend: Vite build
+    # =========================
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install frontend dependencies
+      run: npm install
+
+    - name: Build frontend
+      run: npm run build
+
+    # =========================
+    # AWS credentials (Learner Lab)
+    # =========================
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    # =========================
+    # Deploy frontend to S3
+    # =========================
+    - name: Deploy frontend to S3
+      run: |
+        aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
+
+    # ==================================================
+    # BACKEND: Go → Docker → ECR
+    # ==================================================
+
+    - name: Login to Amazon ECR
+      run: |
+        aws ecr get-login-password --region us-east-1 \
+        | docker login --username AWS --password-stdin \
+          184143007829.dkr.ecr.us-east-1.amazonaws.com
+
+    - name: Build and tag Docker image
+      run: |
+        docker build -t cart-service:latest ./cart-service
+        docker tag cart-service:latest \
+          184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
+
+    - name: Push Docker image to ECR
+      run: |
+        docker push \
+          184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
