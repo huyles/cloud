@@ -1,23 +1,23 @@
-name: Full CI/CD (Frontend + Backend + ECS Fargate)
+name: Full CI/CD (Frontend → S3 | Backend → ECR → ECS)
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # =================================================
-    # 1. CHECKOUT SOURCE CODE
-    # =================================================
+    # ======================================================
+    # 1. CHECKOUT SOURCE
+    # ======================================================
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # =================================================
-    # 2. FRONTEND: VITE BUILD
-    # =================================================
+    # ======================================================
+    # 2. FRONTEND — VITE BUILD
+    # ======================================================
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -26,12 +26,12 @@ jobs:
     - name: Install frontend dependencies
       run: npm install
 
-    - name: Build frontend
+    - name: Build frontend (Vite)
       run: npm run build
 
-    # =================================================
-    # 3. CONFIGURE AWS (LEARNER LAB)
-    # =================================================
+    # ======================================================
+    # 3. AWS CREDENTIALS (LEARNER LAB SAFE)
+    # ======================================================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -40,37 +40,39 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    # =================================================
-    # 4. DEPLOY FRONTEND TO S3
-    # =================================================
+    # ======================================================
+    # 4. DEPLOY FRONTEND → S3 (NO s3 sync)
+    # ======================================================
     - name: Deploy frontend to S3
       run: |
-        aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
+        aws s3 cp dist s3://flashdrop-dev-frontend-184143007829 \
+          --recursive \
+          --cache-control "no-cache"
 
-    # =================================================
-    # 5. BACKEND: DOCKER → ECR
-    # =================================================
+    # ======================================================
+    # 5. BACKEND — LOGIN TO ECR
+    # ======================================================
     - name: Login to Amazon ECR
       run: |
         aws ecr get-login-password --region us-east-1 \
         | docker login --username AWS --password-stdin \
-          184143007829.dkr.ecr.us-east-1.amazonaws.com
+        184143007829.dkr.ecr.us-east-1.amazonaws.com
 
-    - name: Build and tag Docker image
+    # ======================================================
+    # 6. BUILD & PUSH DOCKER IMAGE (GO SERVICE)
+    # ======================================================
+    - name: Build and push Docker image
       run: |
-        docker build -t cart-service:latest ./cart-service
-        docker tag cart-service:latest \
+        docker build -t flashdrop-dev-cart-service ./cart-service
+        docker tag flashdrop-dev-cart-service:latest \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
-
-    - name: Push Docker image to ECR
-      run: |
         docker push \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
-    # =================================================
-    # 6. FORCE ECS FARGATE REDEPLOY
-    # =================================================
-    - name: Force ECS Fargate redeploy
+    # ======================================================
+    # 7. FORCE ECS FARGATE REDEPLOY
+    # ======================================================
+    - name: Force ECS redeploy
       run: |
         aws ecs update-service \
           --cluster flashdrop-dev-cluster \
