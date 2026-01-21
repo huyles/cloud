@@ -1,4 +1,4 @@
-name: Full CI/CD (Frontend + Backend + ECS)
+name: Full CI/CD (Frontend + Backend + ECS Fargate)
 
 on:
   push:
@@ -9,15 +9,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # =========================
-    # Checkout source
-    # =========================
-    - name: Checkout repo
+    # =================================================
+    # 1. CHECKOUT SOURCE CODE
+    # =================================================
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    # =========================
-    # FRONTEND (Vite → S3)
-    # =========================
+    # =================================================
+    # 2. FRONTEND: VITE BUILD
+    # =================================================
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -29,9 +29,9 @@ jobs:
     - name: Build frontend
       run: npm run build
 
-    # =========================
-    # AWS Credentials (Learner Lab)
-    # =========================
+    # =================================================
+    # 3. CONFIGURE AWS (LEARNER LAB)
+    # =================================================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -40,13 +40,16 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
+    # =================================================
+    # 4. DEPLOY FRONTEND TO S3
+    # =================================================
     - name: Deploy frontend to S3
       run: |
         aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
 
-    # =========================
-    # BACKEND (Go → Docker → ECR)
-    # =========================
+    # =================================================
+    # 5. BACKEND: DOCKER → ECR
+    # =================================================
     - name: Login to Amazon ECR
       run: |
         aws ecr get-login-password --region us-east-1 \
@@ -64,12 +67,12 @@ jobs:
         docker push \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
-    # =========================
-    # FORCE REDEPLOY ECS FARGATE
-    # =========================
+    # =================================================
+    # 6. FORCE ECS FARGATE REDEPLOY
+    # =================================================
     - name: Force ECS Fargate redeploy
       run: |
         aws ecs update-service \
-          --cluster flashdrop-cluster \
-          --service cart-service \
+          --cluster flashdrop-dev-cluster \
+          --service flashdrop-dev-cart-service \
           --force-new-deployment
