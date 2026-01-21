@@ -2,7 +2,7 @@ name: Full CI/CD (Frontend → S3 | Backend → ECR → ECS)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build-and-deploy:
@@ -10,7 +10,7 @@ jobs:
 
     steps:
     # ======================================================
-    # 1. CHECKOUT SOURCE
+    # 1. CHECKOUT CODE
     # ======================================================
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -26,11 +26,11 @@ jobs:
     - name: Install frontend dependencies
       run: npm install
 
-    - name: Build frontend (Vite)
+    - name: Build frontend
       run: npm run build
 
     # ======================================================
-    # 3. AWS CREDENTIALS (LEARNER LAB SAFE)
+    # 3. AWS AUTH (LEARNER LAB)
     # ======================================================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -41,16 +41,16 @@ jobs:
         aws-region: us-east-1
 
     # ======================================================
-    # 4. DEPLOY FRONTEND → S3 (NO s3 sync)
+    # 4. DEPLOY FRONTEND → USER-CREATED S3 BUCKET
     # ======================================================
     - name: Deploy frontend to S3
       run: |
-        aws s3 cp dist s3://flashdrop-dev-frontend-184143007829 \
+        aws s3 cp dist s3://flashdrop-frontend-new-1040388305 \
           --recursive \
           --cache-control "no-cache"
 
     # ======================================================
-    # 5. BACKEND — LOGIN TO ECR
+    # 5. LOGIN TO AMAZON ECR
     # ======================================================
     - name: Login to Amazon ECR
       run: |
@@ -59,7 +59,7 @@ jobs:
         184143007829.dkr.ecr.us-east-1.amazonaws.com
 
     # ======================================================
-    # 6. BUILD & PUSH DOCKER IMAGE (GO SERVICE)
+    # 6. BUILD & PUSH BACKEND IMAGE
     # ======================================================
     - name: Build and push Docker image
       run: |
