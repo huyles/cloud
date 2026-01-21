@@ -1,73 +1,80 @@
-name: Full CI/CD (Frontend CI + Backend CD)
+name: Smart CI/CD (Folder-based)
 
 on:
   push:
     branches: ["main"]
 
 jobs:
+  # ======================================================
+  # 1. FRONTEND CI 
+  # ======================================================
   frontend-ci:
-    name: Frontend CI (Vite Build on Change)
+    name: Frontend CI (Vite build)
     runs-on: ubuntu-latest
-    
+
+
     if: |
-      contains(github.event.head_commit.message, 'frontend') ||
-      contains(github.event.head_commit.modified, 'src/') ||
-      contains(github.event.head_commit.modified, 'public/')
+      contains(join(github.event.head_commit.modified, ' '), 'src/') ||
+      contains(join(github.event.head_commit.modified, ' '), 'public/') ||
+      contains(join(github.event.head_commit.modified, ' '), 'package.json') ||
+      contains(join(github.event.head_commit.modified, ' '), 'vite.config')
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    - name: Install frontend dependencies
-      run: npm install
+      - name: Install frontend dependencies
+        run: npm install
 
-    - name: Build frontend with Vite
-      run: npm run build
+      - name: Build frontend (Vite)
+        run: npm run build
 
-    - name: Upload frontend build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: frontend-dist
-        path: dist
 
+
+  # ======================================================
+  # 2. BACKEND CI/CD 
+  # ======================================================
   backend-cicd:
     name: Backend CI/CD (Docker → ECR → ECS)
     runs-on: ubuntu-latest
 
+    if: |
+      contains(join(github.event.head_commit.modified, ' '), 'cart-service/')
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: us-east-1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
-    - name: Login to Amazon ECR
-      run: |
-        aws ecr get-login-password --region us-east-1 \
-        | docker login --username AWS --password-stdin \
-          184143007829.dkr.ecr.us-east-1.amazonaws.com
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+          | docker login --username AWS --password-stdin \
+            184143007829.dkr.ecr.us-east-1.amazonaws.com
 
-    - name: Build and push Docker image
-      run: |
-        docker build -t flashdrop-dev-cart-service ./cart-service
-        docker tag flashdrop-dev-cart-service:latest \
-          184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
-        docker push \
-          184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
+      - name: Build & push Docker image
+        run: |
+          docker build -t flashdrop-dev-cart-service ./cart-service
+          docker tag flashdrop-dev-cart-service:latest \
+            184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
+          docker push \
+            184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
-    - name: Force ECS Fargate redeploy
-      run: |
-        aws ecs update-service \
-          --cluster flashdrop-dev-cluster \
-          --service flashdrop-dev-cart-service \
-          --force-new-deployment
+      - name: Force ECS Fargate redeploy
+        run: |
+          aws ecs update-service \
+            --cluster flashdrop-dev-cluster \
+            --service flashdrop-dev-cart-service \
+            --force-new-deployment
