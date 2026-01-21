@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchProductById, getLiveInventory, reserveItem, Product, getCurrentPrice, isFlashSaleActive } from '../data/products'
+import { fetchProductById, getLiveInventory, reserveItem, Product, getCurrentPrice, isFlashSaleActive, getDiscountPercentage } from '../data/products'
 import FlashSaleTimer from '../components/FlashSaleTimer'
 
 const ProductPage: React.FC = () => {
@@ -197,16 +197,9 @@ const ProductPage: React.FC = () => {
           
           {/* Dynamic pricing based on flash sale */}
           <div style={{ marginBottom: '1.5rem' }}>
-            {product.flashSale && isFlashSaleActive(product.flashSale) ? (
+            {product.isFlashSale ? (
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '0.75rem' }}>
-                  <span style={{ 
-                    fontSize: '2.5rem', 
-                    fontWeight: 'bold', 
-                    color: '#ff6b6b'
-                  }}>
-                    ${getCurrentPrice(product)}
-                  </span>
                   <span style={{ 
                     fontSize: '1.5rem', 
                     textDecoration: 'line-through', 
@@ -214,26 +207,32 @@ const ProductPage: React.FC = () => {
                   }}>
                     ${product.price}
                   </span>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{ 
-                    background: '#ff6b6b',
+                  <span style={{ 
+                    fontSize: '2.5rem', 
+                    fontWeight: 'bold', 
+                    color: '#ff4444'
+                  }}>
+                    ${getCurrentPrice(product)}
+                  </span>
+                  <span style={{ 
+                    background: '#ff4444',
                     color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '6px',
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '4px',
                     fontWeight: 'bold',
                     fontSize: '1rem'
                   }}>
-                    {Math.round(((product.price - getCurrentPrice(product)) / product.price) * 100)}% OFF
-                  </div>
-                  <span style={{ 
-                    color: '#28a745', 
-                    fontWeight: 'bold',
-                    fontSize: '1.1rem'
-                  }}>
-                    You save ${product.price - getCurrentPrice(product)}!
+                    {getDiscountPercentage()}% OFF
                   </span>
+                </div>
+                
+                <div style={{ 
+                  color: '#28a745', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  You save ${product.price - getCurrentPrice(product)}!
                 </div>
                 
                 <div style={{ 
@@ -246,22 +245,6 @@ const ProductPage: React.FC = () => {
                   fontWeight: '500'
                 }}>
                   🔥 <strong>Flash Sale Price!</strong> Limited time offer - regular price ${product.price}
-                </div>
-              </div>
-            ) : product.flashSale ? (
-              <div>
-                <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#666' }}>
-                  ${product.price}
-                </p>
-                <div style={{ 
-                  background: '#f8f9fa',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  padding: '0.75rem',
-                  color: '#6c757d',
-                  fontSize: '0.9rem'
-                }}>
-                  ⏰ Flash sale not currently active. Check back later for special pricing!
                 </div>
               </div>
             ) : (

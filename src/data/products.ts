@@ -354,9 +354,18 @@ export const formatTimeRemaining = (milliseconds: number): string => {
   }
 }
 
+// Flash sale discount rate (20% off)
+export const FLASH_SALE_DISCOUNT_RATE = 0.20
+
 export const getCurrentPrice = (product: Product): number => {
-  if (product.flashSale && isFlashSaleActive(product.flashSale)) {
-    return product.flashSale.salePrice
+  // If product is marked as flash sale, apply 20% discount
+  if (product.isFlashSale) {
+    return Math.round(product.price * (1 - FLASH_SALE_DISCOUNT_RATE))
   }
   return product.price
+}
+
+// Get the discount percentage for display
+export const getDiscountPercentage = (): number => {
+  return Math.round(FLASH_SALE_DISCOUNT_RATE * 100)
 }

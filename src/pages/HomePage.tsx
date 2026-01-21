@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchProducts, Product, isFlashSaleActive, getFlashSaleStatus, getCurrentPrice } from '../data/products'
+import { fetchProducts, Product, isFlashSaleActive, getCurrentPrice, getDiscountPercentage } from '../data/products'
 import FlashSaleTimer from '../components/FlashSaleTimer'
 
 const HomePage: React.FC = () => {
@@ -51,10 +51,6 @@ const HomePage: React.FC = () => {
       <div className="products-container">
         {products.map(product => {
           const isOnSale = product.flashSale && isFlashSaleActive(product.flashSale)
-          const currentPrice = getCurrentPrice(product)
-          const discount = isOnSale && product.flashSale 
-            ? Math.round((1 - currentPrice / product.price) * 100)
-            : 0
 
           return (
             <div key={product.id} className="product-item">
@@ -88,18 +84,16 @@ const HomePage: React.FC = () => {
                 
                 {/* Price Section */}
                 <div className="price-section">
-                  {isOnSale && product.flashSale ? (
+                  {product.isFlashSale ? (
                     <>
-                      <span className="sale-price">${currentPrice}</span>
                       <span className="original-price">${product.price}</span>
-                      {discount > 0 && (
-                        <div className="savings-badge">
-                          SAVE ${product.price - currentPrice} ({discount}% OFF)
-                        </div>
-                      )}
+                      <span className="sale-price">${getCurrentPrice(product)}</span>
+                      <div className="savings-badge">
+                        {getDiscountPercentage()}% OFF
+                      </div>
                     </>
                   ) : (
-                    <span className="regular-price">${currentPrice}</span>
+                    <span className="regular-price">${getCurrentPrice(product)}</span>
                   )}
                 </div>
 

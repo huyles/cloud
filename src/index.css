@@ -137,23 +137,28 @@ body {
 
 /* Flash sale pricing styles */
 .sale-price {
-  color: #ff6b6b !important;
+  color: #ff4444 !important;
   font-weight: bold;
+  font-size: 1.4rem;
+  margin-right: 0.5rem;
 }
 
 .original-price {
   text-decoration: line-through;
   color: #999;
+  font-size: 1rem;
+  margin-right: 0.5rem;
 }
 
 .savings-badge {
-  background: #ff6b6b;
+  background: #ff4444;
   color: white;
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: bold;
   display: inline-block;
+  margin-left: 0.25rem;
 }
 
 .discount-percentage {
