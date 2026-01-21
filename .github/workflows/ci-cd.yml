@@ -1,4 +1,4 @@
-name: Full CI/CD (Frontend → S3 | Backend → ECR → ECS)
+name: Full CI/CD (Frontend + Backend + ECS)
 
 on:
   push:
@@ -9,15 +9,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # ======================================================
-    # 1. CHECKOUT CODE
-    # ======================================================
+    # =========================
+    # Checkout
+    # =========================
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ======================================================
-    # 2. FRONTEND — VITE BUILD
-    # ======================================================
+    # =========================
+    # FRONTEND (Vite → S3)
+    # =========================
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -29,9 +29,9 @@ jobs:
     - name: Build frontend
       run: npm run build
 
-    # ======================================================
-    # 3. AWS AUTH (LEARNER LAB)
-    # ======================================================
+    # =========================
+    # AWS Credentials (Learner Lab)
+    # =========================
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -40,41 +40,36 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
-    # ======================================================
-    # 4. DEPLOY FRONTEND → USER-CREATED S3 BUCKET
-    # ======================================================
     - name: Deploy frontend to S3
       run: |
-        aws s3 cp dist s3://flashdrop-frontend-new-1040388305 \
-          --recursive \
-          --cache-control "no-cache"
+        aws s3 sync dist s3://flashdrop-dev-frontend-184143007829 --delete
 
-    # ======================================================
-    # 5. LOGIN TO AMAZON ECR
-    # ======================================================
+    # =========================
+    # BACKEND (Docker → ECR)
+    # =========================
     - name: Login to Amazon ECR
       run: |
         aws ecr get-login-password --region us-east-1 \
         | docker login --username AWS --password-stdin \
-        184143007829.dkr.ecr.us-east-1.amazonaws.com
+          184143007829.dkr.ecr.us-east-1.amazonaws.com
 
-    # ======================================================
-    # 6. BUILD & PUSH BACKEND IMAGE
-    # ======================================================
-    - name: Build and push Docker image
+    - name: Build and tag Docker image
       run: |
-        docker build -t flashdrop-dev-cart-service ./cart-service
-        docker tag flashdrop-dev-cart-service:latest \
+        docker build -t cart-service:latest ./cart-service
+        docker tag cart-service:latest \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
+
+    - name: Push Docker image to ECR
+      run: |
         docker push \
           184143007829.dkr.ecr.us-east-1.amazonaws.com/flashdrop-dev-cart-service:latest
 
-    # ======================================================
-    # 7. FORCE ECS FARGATE REDEPLOY
-    # ======================================================
+    # =========================
+    # FORCE ECS FARGATE REDEPLOY
+    # =========================
     - name: Force ECS redeploy
       run: |
         aws ecs update-service \
           --cluster flashdrop-dev-cluster \
-          --service flashdrop-dev-cart-service \
+          --service <SERVICE_NAME> \
           --force-new-deployment
